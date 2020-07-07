@@ -75,7 +75,6 @@ local function initialize()
 		'toolManager',
 		'triggers', 
 		'turn',
-		'traffic',
 		'TrafficCollision',
 		'ProximitySensor',
 		'vehicles',
