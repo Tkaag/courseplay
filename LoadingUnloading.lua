@@ -321,7 +321,7 @@ end
 LoadTrigger.setIsLoading = Utils.overwrittenFunction(LoadTrigger.setIsLoading,courseplay.setIsLoading)
 
 --LoadTrigger callback used to open correct cover for loading 
-function courseplay:loadTriggerCallback(superFunc,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
+function courseplay:loadTriggerCallback(triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
 	--legancy code!!!
 	courseplay:SiloTrigger_TriggerCallback(self, triggerId, otherActorId, onEnter, onLeave, onStay, otherShapeId)
 	
@@ -331,33 +331,42 @@ function courseplay:loadTriggerCallback(superFunc,triggerId, otherId, onEnter, o
 		rootVehicle = fillableObject:getRootVehicle()
 	end
 	if courseplay:checkAIDriver(rootVehicle) then
+		continue =true
 		if not rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) and not rootVehicle.cp.driver:is_a(FieldSupplyAIDriver) then
-			return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
+	--		return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
+			continue = false
 		end
-		if onEnter then 
+		if continue and onEnter then 
 			courseplay.debugFormat(2, 'LoadTrigger onEnter')
 			rootVehicle.cp.driver:setInTriggerRange()
 			if fillableObject.getFillUnitIndexFromNode ~= nil then
-				local fillLevels, capacity = self.source:getAllFillLevels(g_currentMission:getFarmId())
-				local foundFillUnitIndex = fillableObject:getFillUnitIndexFromNode(otherId)
-				for fillTypeIndex, fillLevel in pairs(fillLevels) do
-					if fillableObject:getFillUnitSupportsFillType(foundFillUnitIndex, fillTypeIndex) then
-						if fillableObject:getFillUnitAllowsFillType(foundFillUnitIndex, fillTypeIndex) then
-							SpecializationUtil.raiseEvent(fillableObject, "onAddedFillUnitTrigger",fillTypeIndex,foundFillUnitIndex,1)
-							courseplay.debugFormat(2, 'open Cover for loading')
+				local fillLevels, capacity
+				if self.source.getAllFillLevels then
+					fillLevels, capacity = self.source:getAllFillLevels(g_currentMission:getFarmId())
+				elseif self.source.getAllProvidedFillLevels then
+					fillLevels, capacity = self.source:getAllProvidedFillLevels(g_currentMission:getFarmId(), self.managerId)
+				end
+				if fillLevels then
+					local foundFillUnitIndex = fillableObject:getFillUnitIndexFromNode(otherId)
+					for fillTypeIndex, fillLevel in pairs(fillLevels) do
+						if fillableObject:getFillUnitSupportsFillType(foundFillUnitIndex, fillTypeIndex) then
+							if fillableObject:getFillUnitAllowsFillType(foundFillUnitIndex, fillTypeIndex) then
+								SpecializationUtil.raiseEvent(fillableObject, "onAddedFillUnitTrigger",fillTypeIndex,foundFillUnitIndex,1)
+								courseplay.debugFormat(2, 'open Cover for loading')
+							end
 						end
 					end
 				end
 			end
 		end
-		if onLeave then
+		if continue and onLeave then
 			courseplay.debugFormat(2, 'LoadTrigger onLeave')
 		end
-		rootVehicle.cp.driver:isInFirstLoadingTrigger(triggerId)
+		--rootVehicle.cp.driver:isInFirstLoadingTrigger(triggerId)
 	end
-	return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
+--	return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
 end
-LoadTrigger.loadTriggerCallback = Utils.overwrittenFunction(LoadTrigger.loadTriggerCallback,courseplay.loadTriggerCallback)
+LoadTrigger.loadTriggerCallback = Utils.appendedFunction(LoadTrigger.loadTriggerCallback,courseplay.loadTriggerCallback)
 
 --FillTrigger callback used to set approach speed for Cp driver
 function courseplay:fillTriggerCallback(superFunc, triggerId, otherActorId, onEnter, onLeave, onStay, otherShapeId)

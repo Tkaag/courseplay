@@ -146,25 +146,17 @@ function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 		else
 			if fillType == FillType.SEEDS then hasSeeds = true end
 		end		
+		--skip all the fillTypes not assigned 
+		--TODO: needs tweaking!!
 		if fillTypeData then 
-			for _,data in ipairs(fillTypeData) do
+			local foundFillType 
+			for _,data in pairs(fillTypeData) do 
 				if data.fillType == fillType then
-					local fillLevelPercentage = info.fillLevel/info.capacity*100
-					if data.maxFillLevel and fillLevelPercentage >= data.maxFillLevel then 
-						if self.fillableObject and self.fillableObject.fillType == fillType then
-							if self.fillableObject.trigger then 
-								if self.fillableObject.trigger:isa(Vehicle) then --disable filling at Augerwagons
-									--TODO!!
-								else --disable filling at LoadingTriggers
-									self.fillableObject.trigger:stopLoading()
-								--	self:resetLoadingState()
-								end
-							else -- diable filling at fillTriggers
-								self.fillableObject.object:setFillUnitIsFilling(false)
-							end
-						end
-					end
+					foundFillType=true
 				end
+			end
+			if not foundFillType then 
+				allOk=true
 			end
 		end
 	end
@@ -301,7 +293,7 @@ function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
 								else --disable filling at LoadingTriggers
 									self.fillableObject.trigger:setIsLoading(false)
 								end
-							else -- diable filling at fillTriggers
+							else -- disable filling at fillTriggers
 								self.fillableObject.object:setFillUnitIsFilling(false)
 							end
 						end
