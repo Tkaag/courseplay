@@ -761,7 +761,7 @@ function courseplay.hud:updatePageContent(vehicle, page)
 						self:updateSiloSelectedFillTypeList(vehicle,page,3,7,"GrainTransportDriver",line)	
 					elseif string.find(entry.functionToCall, "FillableFieldWorkDriver") then 
 						self:updateSiloSelectedFillTypeList(vehicle,page,6,7,"FillableFieldWorkDriver",line)	
-					else --FieldSupplyDriver
+					elseif string.find(entry.functionToCall, "FieldSupplyDriver") then --FieldSupplyDriver
 						self:updateSiloSelectedFillTypeList(vehicle,page,3,4,"FieldSupplyDriver",line)	
 					end			
 				elseif entry.functionToCall == 'switchDriverCopy' then
@@ -1840,7 +1840,7 @@ end
 
 function courseplay.hud:setupCombinesListPageButtons(vehicle,page)
 	for i=3, self.numLines do
-		self:addRowButton(vehicle,'toggleAssignCombineToTractor', page, i, 1)
+		self:addRowButton(vehicle,nil,'toggleAssignCombineToTractor', page, i, 1)
 	end;
 	local combinesListMouseWheelArea = {
 		x = self.contentMinX,
@@ -1848,7 +1848,7 @@ function courseplay.hud:setupCombinesListPageButtons(vehicle,page)
 		width = self.buttonCoursesPosX[4] - self.contentMinX,
 		height = self.linesPosY[3] + self.lineHeight - self.linesPosY[self.numLines]
 	};
-	vehicle.cp.hud.combinesListMouseArea= courseplay.button:new(vehicle, 'global', nil, 'AIDriver:shiftCombinesList', -1, combinesListMouseWheelArea.x, combinesListMouseWheelArea.y, combinesListMouseWheelArea.width, combinesListMouseWheelArea.height, nil, -self.numLines, true, true);
+	vehicle.cp.hud.combinesListMouseArea= courseplay.button:new(vehicle, 'global', nil, 'shiftCombinesList', -1, combinesListMouseWheelArea.x, combinesListMouseWheelArea.y, combinesListMouseWheelArea.width, combinesListMouseWheelArea.height, nil, -self.numLines, true, true);
 	print("vehicle.cp.hud.combinesListMouseArea: "..tostring(vehicle.cp.hud.combinesListMouseArea))
 end
 

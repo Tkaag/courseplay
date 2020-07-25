@@ -26,23 +26,36 @@ function courseplay:setAIDriver(vehicle, mode)
 	if vehicle.cp.driver then
 		vehicle.cp.driver:delete()
 	end
+	local status,driver,err
 	if mode == courseplay.MODE_TRANSPORT then
 		---@type AIDriver
-		vehicle.cp.driver = AIDriver(vehicle)
+	--	vehicle.cp.driver = AIDriver(vehicle)
+		status,driver,err = xpcall(AIDriver, function(err) printCallstack(); return self,err end, vehicle)
 	elseif mode == courseplay.MODE_GRAIN_TRANSPORT then
+		status,driver,err = xpcall(GrainTransportAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = GrainTransportAIDriver(vehicle)	
 	elseif mode == courseplay.MODE_COMBI then
+		status,driver,err = xpcall(CombineUnloadAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = CombineUnloadAIDriver(vehicle)
 	elseif mode == courseplay.MODE_SHOVEL_FILL_AND_EMPTY then
+		status,driver,err = xpcall(ShovelModeAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = ShovelModeAIDriver(vehicle)
 	elseif mode == courseplay.MODE_SEED_FERTILIZE then
+		status,driver,err = xpcall(FillableFieldworkAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = FillableFieldworkAIDriver(vehicle)
 	elseif mode == courseplay.MODE_FIELDWORK then
+		status,driver,err = xpcall(UnloadableFieldworkAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = UnloadableFieldworkAIDriver.create(vehicle)
 	elseif mode == courseplay.MODE_BUNKERSILO_COMPACTER then
+		status,driver,err = xpcall(LevelCompactAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = LevelCompactAIDriver(vehicle)
 	elseif mode == courseplay.MODE_FIELD_SUPPLY then
+		status,driver,err = xpcall(FieldSupplyAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = FieldSupplyAIDriver(vehicle)
+	end
+	vehicle.cp.driver = driver
+	if not status then
+		courseplay.infoVehicle(vehicle, 'Exception, stopping Courseplay driver, %s', tostring(err))
 	end
 end
 
@@ -1696,11 +1709,11 @@ function courseplay:toggleAssignCombineToTractor(vehicle,line)
 	end
 end
 
---function courseplay:shiftCombinesList(vehicle, change_by)
---	if vehicle.cp.driver.shiftCombinesList then 
---		vehicle.cp.driver:shiftCombinesList(change_by)
---	end
---end
+function courseplay:shiftCombinesList(vehicle, change_by)
+	if vehicle.cp.driver.shiftCombinesList then 
+		vehicle.cp.driver:shiftCombinesList(change_by)
+	end
+end
 ----------------------------------------------------------------------------------------------------
 
 function courseplay:setCpVar(varName, value, noEventSend)
