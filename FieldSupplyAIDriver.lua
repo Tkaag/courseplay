@@ -42,10 +42,9 @@ function FieldSupplyAIDriver:setHudContent()
 	courseplay.hud:setFieldSupplyAIDriverContent(self.vehicle)
 end
 
---TODO: fix the derived problems
 function FieldSupplyAIDriver:start(startingPoint)
 	self:beforeStart()
-	self.course = Course(self.vehicle , self.vehicle.Waypoints)
+	self.course = Course(self.vehicle, self.vehicle.Waypoints)
 	self.ppc:setCourse(self.course)
 	local ix = self.course:getStartingWaypointIx(AIDriverUtil.getDirectionNode(self.vehicle), startingPoint)
 	self.ppc:initialize(ix)
