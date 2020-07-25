@@ -52,6 +52,7 @@ local function initialize()
 		'DevHelper',
 		'CpManager',
 		'base',
+		'LoadingUnloading',
 		'button',
 		'bunkersilo_management',
 		'BunkersiloManager',
@@ -127,6 +128,8 @@ local function initialize()
 		'Events/StartStopWorkEvent',
 		'Events/UserConnectedEvent',
 		'Events/PostSyncEvent',
+		'Events/LinkedListSettingsEvent',
+		'Events/SettingsListEvent',
 		'Generic/LinkedList'
 	};
 
@@ -347,9 +350,9 @@ local function setGlobalData()
 	[88]={name='self.cp.generationPosition.x',dataFormat='Float'},
 	[89]={name='self.cp.generationPosition.z',dataFormat='Float'}
 	}
-
+	
 	-- TODO: see where is the best to instantiate these settings. Maybe we need a container for all these
-	courseplay.globalSettings = SettingsContainer()
+	courseplay.globalSettings = SettingsContainer("globalSettings")
 	courseplay.globalSettings:addSetting(LoadCoursesAtStartupSetting)
 	courseplay.globalSettings:addSetting(AutoFieldScanSetting)
 	courseplay.globalSettings:addSetting(EarnWagesSetting)

@@ -31,6 +31,7 @@ FillableFieldworkAIDriver.myStates = {
 	TO_BE_REFILLED = {},
 	REFILL_DONE = {}
 }
+
 function FillableFieldworkAIDriver:init(vehicle)
 	courseplay.debugVehicle(11,vehicle,'CombineUnloadAIDriver:init()')
 	FieldworkAIDriver.init(self, vehicle)
@@ -58,24 +59,12 @@ end
 --- Drive the refill part of the course
 function FillableFieldworkAIDriver:driveUnloadOrRefill()
 	local isNearWaitPoint, waitPointIx = self.course:hasWaitPointWithinDistance(self.ppc:getCurrentWaypointIx(), 5)
-
-	self:searchForRefillTriggers()
+	
+	courseplay:isTriggerAvailable(self.vehicle)
+	
 	if self.course:isTemporary() then
 		-- use the courseplay speed limit until we get to the actual unload corse fields (on alignment/temporary)
 		self:setSpeed(self.vehicle.cp.speeds.field)
-	elseif self:getIsInFilltrigger() then
-		-- our raycast in searchForRefillTriggers found a fill trigger
-		local allowedToDrive = true
-		-- lx, lz is not used by refillWorkTools, allowedToDrive is returned, should be refactored, but use it for now as it is
-		allowedToDrive, _, _ = courseplay:refillWorkTools(self.vehicle, self.vehicle.cp.refillUntilPct, allowedToDrive, 0, 1)
-		if allowedToDrive then
-			-- slow down to field speed around fill triggers
-			self:setSpeed(math.min(self.vehicle.cp.speeds.turn, self:getRecordedSpeed()))
-		else
-			-- stop for refill when refillWorkTools tells us
-			self:debugSparse('refillWorkTools() tells us to stop')
-			self:setSpeed( 0)
-		end
 	elseif  self.refillState == self.states.TO_BE_REFILLED and isNearWaitPoint then
 		local allowedToDrive = true;
 		local distanceToWait = self.course:getDistanceBetweenVehicleAndWaypoint(self.vehicle, waitPointIx)
@@ -84,12 +73,20 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 			allowedToDrive = self:fillAtWaitPoint()
 		end	
 		if not allowedToDrive then
-			self:setSpeed( 0)
+			self:setSpeed(0)
 		end
 	else
 		-- just drive normally
 		self:setSpeed(self:getRecordedSpeed())
 	end
+	if self.loadingState == self.states.IS_LOADING  then
+		self:checkFilledUnitFillPercantage()
+		if self.fillableObject and self.fillableObject.object and self.fillableObject.fillUnitIndex then
+			local fillLevel = self.fillableObject.object:getFillUnitFillLevel(self.fillableObject.fillUnitIndex)
+			local fillCapacity = self.fillableObject.object:getFillUnitCapacity(self.fillableObject.fillUnitIndex)
+			courseplay:setInfoText(self.vehicle, string.format("COURSEPLAY_LOADING_AMOUNT;%d;%d",math.floor(fillLevel),fillCapacity))
+		end
+	end	
 	return false
 end
 
@@ -120,6 +117,7 @@ end
 function FillableFieldworkAIDriver:continue()
 	self:debug('Continuing...')
 	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
+	self.loadingState = self.states.NOTHING
 	self.refillState = self.states.REFILL_DONE	
 	self:clearAllInfoTexts()
 end
@@ -129,13 +127,45 @@ end
 function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 	local allOk = true
 	local hasSeeds, hasNoFertilizer = false, false
-
+	local siloSelectedFillTypeData = nil
+	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
+		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
+	elseif self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
+	else
+		--diff driver...
+	end	
+	local fillTypeData = nil
+	if siloSelectedFillType then
+		fillTypeData = siloSelectedFillType:getData()
+	end
 	for fillType, info in pairs(fillLevelInfo) do
 		if self:isValidFillType(fillType) and info.fillLevel == 0 and info.capacity > 0 and not self:helperBuysThisFillType(fillType) then
 			allOk = false
 			if fillType == FillType.FERTILIZER or fillType == FillType.LIQUIDFERTILIZER then hasNoFertilizer = true end
 		else
 			if fillType == FillType.SEEDS then hasSeeds = true end
+		end		
+		if fillTypeData then 
+			for _,data in ipairs(fillTypeData) do
+				if data.fillType == fillType then
+					local fillLevelPercentage = info.fillLevel/info.capacity*100
+					if data.maxFillLevel and fillLevelPercentage >= data.maxFillLevel then 
+						if self.fillableObject and self.fillableObject.fillType == fillType then
+							if self.fillableObject.trigger then 
+								if self.fillableObject.trigger:isa(Vehicle) then --disable filling at Augerwagons
+									--TODO!!
+								else --disable filling at LoadingTriggers
+									self.fillableObject.trigger:stopLoading()
+								--	self:resetLoadingState()
+								end
+							else -- diable filling at fillTriggers
+								self.fillableObject.object:setFillUnitIsFilling(false)
+							end
+						end
+					end
+				end
+			end
 		end
 	end
 	-- special handling for sowing machines with fertilizer
@@ -201,37 +231,6 @@ function FillableFieldworkAIDriver:helperBuysThisFillType(fillType)
 	return false
 end
 
-function FillableFieldworkAIDriver:searchForRefillTriggers()
-	-- look straight ahead for now. The rest of CP looks into the direction of the 'current waypoint'
-	-- but we don't have that information (lx/lz) here. See if we can get away with this, should only
-	-- be a problem if we have a sharp curve around the trigger
-	if not self.ppc:isReversing() then
-		local x, y, z = localToWorld(self:getDirectionNode(), 0, 1, 3)
-		local nx, ny, nz = localDirectionToWorld(self:getDirectionNode(), 0, -0.1, 1)
-		-- raycast start point in front of vehicle
-		courseplay:doTriggerRaycasts(self.vehicle, 'specialTrigger', 'fwd', true, x, y, z, nx, ny, nz)
-		
-		--create a hammerhead racast to get small triggerStartId
-		local x, y, z = localToWorld(self:getDirectionNode(), -1.5, 1, 10)
-		local nx, ny, nz = localDirectionToWorld(self:getDirectionNode(), 1, 0, 0)
-		courseplay:doTriggerRaycasts(self.vehicle, 'specialTrigger', 'fwd', false, x, y, z, nx, ny, nz,3)
-		
-	else
-		for _,workTool in pairs(self.vehicle.cp.workTools) do
-			local node = workTool.cp.realTurningNode or workTool.rootNode ;
-			local x, y, z = localToWorld(node, 0, 2, 3)
-			local nx, ny, nz = localDirectionToWorld(node, 0, -0.1, -1)
-			-- raycast start point behind the workTool
-			courseplay:doTriggerRaycasts(self.vehicle, 'specialTrigger', 'rev', false, x, y, z, nx, ny, nz)
-			
-			--create a hammerhead racast to get small triggerStartId
-			local x, y, z = localToWorld(node, -1.5, 1, -10)
-			local nx, ny, nz = localDirectionToWorld(node, 1, 0, 0)
-			courseplay:doTriggerRaycasts(self.vehicle, 'specialTrigger', 'rev', false, x, y, z, nx, ny, nz,3)
-		end
-	end
-end
-
 function FillableFieldworkAIDriver:getFillLevelInfoText()
 	return 'NEEDS_REFILLING'
 end
@@ -242,5 +241,73 @@ function FillableFieldworkAIDriver:setLightsMask(vehicle)
 		vehicle:setLightsTypesMask(courseplay.lights.HEADLIGHT_STREET)
 	else
 		vehicle:setLightsTypesMask(courseplay.lights.HEADLIGHT_FULL)
+	end
+end
+
+function FillableFieldworkAIDriver:setLoadingState(object,fillUnitIndex,fillType,trigger)
+	if object and fillUnitIndex then 
+		self.fillableObject = {}
+		self.fillableObject.object = object
+		self.fillableObject.fillUnitIndex = fillUnitIndex
+		self.fillableObject.fillType = fillType
+		self.fillableObject.trigger = trigger
+	else
+		self.fillableObject = nil
+	end
+	self.loadingState=self.states.IS_LOADING
+end
+
+function FillableFieldworkAIDriver:isFilledUntilPercantageX(currentFillType,maxFillLevel)
+	local fillLevelInfo = {}
+	self:getAllFillLevels(self.vehicle, fillLevelInfo)
+	for fillType, info in pairs(fillLevelInfo) do
+		if fillType == currentFillType then 
+			local fillLevelPercentage = info.fillLevel/info.capacity*100
+			if fillLevelPercentage >= maxFillLevel then
+				return true
+			end
+		end
+	end
+end
+
+function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
+	local siloSelectedFillTypeData = nil
+	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
+		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
+	elseif self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
+	else
+		--diff driver...
+	end	
+	local fillTypeData = nil
+	if siloSelectedFillType then
+		fillTypeData = siloSelectedFillType:getData()
+	end
+	if fillTypeData == nil then
+		return
+	end
+	local fillLevelInfo = {}
+	self:getAllFillLevels(self.vehicle, fillLevelInfo)
+	for fillType, info in pairs(fillLevelInfo) do	
+		if fillTypeData then 
+			for _,data in ipairs(fillTypeData) do
+				if data.fillType == fillType then
+					local fillLevelPercentage = info.fillLevel/info.capacity*100
+					if data.maxFillLevel and fillLevelPercentage >= data.maxFillLevel then 
+						if self.fillableObject and self.fillableObject.fillType == fillType then
+							if self.fillableObject.trigger then 
+								if self.fillableObject.trigger:isa(Vehicle) then --disable filling at Augerwagons
+									--TODO!!
+								else --disable filling at LoadingTriggers
+									self.fillableObject.trigger:setIsLoading(false)
+								end
+							else -- diable filling at fillTriggers
+								self.fillableObject.object:setFillUnitIsFilling(false)
+							end
+						end
+					end
+				end
+			end
+		end
 	end
 end

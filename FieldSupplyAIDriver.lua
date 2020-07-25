@@ -42,11 +42,13 @@ function FieldSupplyAIDriver:setHudContent()
 	courseplay.hud:setFieldSupplyAIDriverContent(self.vehicle)
 end
 
-function FieldSupplyAIDriver:start()
+--TODO: fix the derived problems
+function FieldSupplyAIDriver:start(startingPoint)
 	self:beforeStart()
 	self.course = Course(self.vehicle , self.vehicle.Waypoints)
 	self.ppc:setCourse(self.course)
-	self.ppc:initialize()
+	local ix = self.course:getStartingWaypointIx(AIDriverUtil.getDirectionNode(self.vehicle), startingPoint)
+	self.ppc:initialize(ix)
 	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
 	self.refillState = self.states.REFILL_DONE
 	AIDriver.continue(self)
@@ -69,7 +71,7 @@ function FieldSupplyAIDriver:drive(dt)
 	elseif self.supplyState == self.states.WAITING_FOR_GETTING_UNLOADED then
 		self:stopAndWait(dt)
 		-- unload into a FRC if there is one
-		AIDriver.tipIntoStandardTipTrigger(self)
+	--	AIDriver.tipIntoStandardTipTrigger(self)
 		--if i'm empty or fillLevel is below threshold then drive to get new stuff
 		if self:isFillLevelToContinueReached() then
 			self:continue()
@@ -102,22 +104,17 @@ function FieldSupplyAIDriver:changeSupplyState(newState)
 end
 
 function FieldSupplyAIDriver:isFillLevelToContinueReached()
-	local fillLevelInformations ={}
-	for _, workTool in pairs (self.vehicle.cp.workTools) do
-		workTool:getFillLevelInformation(fillLevelInformations)
-	end
-	local fillLevel = 0
-	local capacity =  0
-	for _, fillTypeInfo in pairs(fillLevelInformations) do
-		fillLevel = fillTypeInfo.fillLevel
-		capacity = fillTypeInfo.capacity
-	end
-	local fillLevelPercent = (fillLevel/capacity) *100
-	if fillLevelPercent < self.vehicle.cp.driveOnAtFillLevel and self:levelDidNotChange(fillLevelPercent) then
-		return true
+	local fillLevelInfo = {}
+	self:getAllFillLevels(self.vehicle, fillLevelInfo)
+	for fillType, info in pairs(fillLevelInfo) do
+		local fillLevelPercentage = info.fillLevel/info.capacity*100
+		if fillLevelPercentage < self.vehicle.cp.driveOnAtFillLevel and self:levelDidNotChange(fillLevelPercentage) then
+			return true
+		end
 	end
 end
 
+--TODO might change this one 
 function FieldSupplyAIDriver:levelDidNotChange(fillLevelPercent)
 	--fillLevel changed in last loop-> start timer
 	if self.prevFillLevelPct == nil or self.prevFillLevelPct ~= fillLevelPercent then

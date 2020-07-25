@@ -129,6 +129,13 @@ AIDriver.myStates = {
 	DONE = {}
 }
 
+AIDriver.myLoadingStates = {
+	IS_LOADING = {},
+	NOTHING = {},
+	APPROACH_TRIGGER = {},
+	IS_UNLOADING = {}
+}
+
 --- Create a new driver (usage: aiDriver = AIDriver(vehicle)
 -- @param vehicle to drive. Will set up a course to drive from vehicle.Waypoints
 function AIDriver:init(vehicle)
@@ -137,6 +144,7 @@ function AIDriver:init(vehicle)
 	self.mode = courseplay.MODE_TRANSPORT
 	self.states = {}
 	self:initStates(AIDriver.myStates)
+	self:initStates(AIDriver.myLoadingStates)
 	self.vehicle = vehicle
 	-- set up a global container on the vehicle to persist AI Driver related data between AIDriver incarnations
 	if not vehicle.cp.aiDriverData then
@@ -170,6 +178,7 @@ function AIDriver:init(vehicle)
 		self.vehicle.cp.settings:validateCurrentValues()
 	end
 	self:setHudContent()
+	self.loadingState = self.states.NOTHING
 end
 
 function AIDriver:writeUpdateStream(streamId)
@@ -240,6 +249,7 @@ end
 function AIDriver:start(startingPoint)
 	self:beforeStart()
 	self.state = self.states.RUNNING
+	self.loadingState = self.states.NOTHING
 	-- derived classes must disable collision detection if they don't need its
 	self:enableCollisionDetection()
 	-- for now, initialize the course with the vehicle's current course
@@ -274,6 +284,7 @@ function AIDriver:stop(msgReference)
 	-- not much to do here, see the derived classes
 	self:setInfoText(msgReference)
 	self.state = self.states.STOPPED
+	self.loadingState = self.states.NOTHING
 end
 
 --- Stop the driver when the work is done. Could just dismiss at this point,
@@ -357,7 +368,10 @@ function AIDriver:drive(dt)
 		self:hold()
 		self:continueIfWaitTimeIsOver()
 	end
-
+	if self.state == self.states.IS_LOADING then
+		self:hold()
+	end	
+--	courseplay:isTriggerAvailable(self.vehicle)
 	self:driveCourse(dt)
 	self:drawTemporaryCourse()
 end
@@ -389,7 +403,18 @@ function AIDriver:driveCourse(dt)
 	if self:getIsInFilltrigger() then
 		self:setSpeed(self.vehicle.cp.speeds.approach)
 	end
-
+	
+	if self.loadingState == self.states.APPROACH_TRIGGER then
+		self:setSpeed(self.vehicle.cp.speeds.approach)
+	end
+	if self.loadingState == self.states.IS_LOADING then
+		self:setSpeed(0)
+	end
+	
+	if self.loadingState == self.states.IS_UNLOADING then
+		self:setSpeed(0)
+	end
+	
 	self:slowDownForWaitPoints()
 
 	self:stopEngineIfNotNeeded()
@@ -1099,7 +1124,7 @@ function AIDriver:dischargeAtTipTrigger(dt)
 			end
 		else
 			--using all standard tip triggers
-			allowedToDrive = self:tipIntoStandardTipTrigger()
+		--	allowedToDrive = self:tipIntoStandardTipTrigger()
 		end;
 	end
 	return allowedToDrive, takeOverSteering
@@ -1789,18 +1814,36 @@ function AIDriver:checkProximitySensor(maxSpeed, allowedToDrive, moveForwards)
 	self:debugSparse('proximity: d = %.1f (%d %%), speed = %.1f', d, 100 * normalizedD, newSpeed)
 	return newSpeed, allowedToDrive
 end
--- disable detachImplement while running AIDriver like GrainTransportAIDriver or CombineUnloadDriver
-function AIDriver:detachImplementByObject(superFunc,object, noEventSend)
-	local rootVehicle = self:getRootVehicle()
-	if rootVehicle and rootVehicle.cp and rootVehicle.cp.driver and rootVehicle.cp.driver:isActive() then 
-		return
-	end
-	return superFunc(self,object, noEventSend)
+
+function AIDriver:setLoadingState(object,fillUnitIndex,fillType,trigger)
+	
 end
-AttacherJoints.detachImplementByObject = Utils.overwrittenFunction(AttacherJoints.detachImplementByObject,AIDriver.detachImplementByObject)
 
+function AIDriver:resetLoadingState()
+	self.loadingState=self.states.NOTHING
+	self.fillableObject = nil
+end
 
+function AIDriver:setInTriggerRange()
+	if self.loadingState==self.states.NOTHING then
+		self.loadingState=self.states.APPROACH_TRIGGER
+	end
+end
 
+function AIDriver:setUnloadingState()
+	self.loadingState=self.states.IS_UNLOADING
+end
 
+function AIDriver:resetUnloadingState()
+	self.loadingState=self.states.NOTHING
+end
 
+function AIDriver:isInFirstLoadingTrigger(triggerId)
+	if self.currentTriggerID == triggerId then
+		return 
+	end
+	if self.currentTriggerID == nil and triggerId then
+		self.currentTriggerID = triggerId
+	end
+end
 

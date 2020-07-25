@@ -92,6 +92,7 @@ function GrainTransportAIDriver:drive(dt)
 		-- we drive the course as usual
 		self:driveCourse(dt)
 	end
+	courseplay:isUnloadingTriggerAvailable(self.vehicle)
 end
 
 function GrainTransportAIDriver:onWaypointChange(newIx)
@@ -119,7 +120,7 @@ function GrainTransportAIDriver:checkLastWaypoint()
 	local allowedToDrive = true
 	if self.ppc:getCurrentWaypointIx() == self.course:getNumberOfWaypoints() then
 		courseplay:openCloseCover(self.vehicle, not courseplay.SHOW_COVERS)
-		if not self.vehicle.cp.settings.siloSelectedFillType:isActive() and not self.vehicle.cp.settings.siloSelectedFillType:hasFillTypes()  then
+		if not self.vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver:isActive() then
 			-- stop at the last waypoint when the run counter expires
 			allowedToDrive = false
 			self:stop('END_POINT_MODE_1')
@@ -169,5 +170,5 @@ end
 function GrainTransportAIDriver:decrementRunCounter()
 	totalFillTypes = {}
 	self:getAllFillTypes(self.vehicle,totalFillTypes)
-	self.vehicle.cp.settings.siloSelectedFillType:decrementRunCounterByFillType(totalFillTypes)
+	self.vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver:decrementRunCounterByFillType(totalFillTypes)
 end

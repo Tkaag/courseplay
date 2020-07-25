@@ -534,11 +534,9 @@ function courseplay:onLoad(savegame)
 	courseplay:validateCanSwitchMode(self);
 	--courseplay.buttons:setActiveEnabled(self, 'all');
 
-	courseplay:setAIDriver(self, self.cp.mode)
-
 	-- TODO: all vehicle specific settings (HUD or advanced settings dialog) should be moved here
 	---@type SettingsContainer
-	self.cp.settings = SettingsContainer()
+	self.cp.settings = SettingsContainer("settings")
 	self.cp.settings:addSetting(SearchCombineOnFieldSetting, self)
 	self.cp.settings:addSetting(SelectedCombineToUnloadSetting)
 	self.cp.settings:addSetting(ReturnToFirstPointSetting, self)
@@ -571,15 +569,19 @@ function courseplay:onLoad(savegame)
 	self.cp.settings:addSetting(RealisticDrivingSetting, self)
 	self.cp.settings:addSetting(DriveUnloadNowSetting, self)
 	self.cp.settings:addSetting(CombineWantsCourseplayerSetting, self)
-	self.cp.settings:addSetting(SiloSelectedFillTypeSetting, self)
 	self.cp.settings:addSetting(TurnOnFieldSetting, self)
 	self.cp.settings:addSetting(TurnStageSetting, self)
+	self.cp.settings:addSetting(GrainTransportDriver_SiloSelectedFillTypeSetting, self)
+	self.cp.settings:addSetting(FillableFieldWorkDriver_SiloSelectedFillTypeSetting, self)
+	self.cp.settings:addSetting(FieldSupplyDriver_SiloSelectedFillTypeSetting, self)
 	
 	---@type SettingsContainer
-	self.cp.courseGeneratorSettings = SettingsContainer()
+	self.cp.courseGeneratorSettings = SettingsContainer("courseGeneratorSettings")
 	self.cp.courseGeneratorSettings:addSetting(CenterModeSetting, self)
 	self.cp.courseGeneratorSettings:addSetting(NumberOfRowsPerLandSetting, self)
 	self.cp.courseGeneratorSettings:addSetting(HeadlandOverlapPercent, self)
+	
+	courseplay:setAIDriver(self, self.cp.mode)
 end;
 
 function courseplay:onPostLoad(savegame)
@@ -1828,26 +1830,6 @@ function courseplay:showTourDialog()
 	print('Tour dialog is disabled by Courseplay.')
 end
 TourIcons.showTourDialog = Utils.overwrittenFunction(TourIcons.showTourDialog, courseplay.showTourDialog)
-
--- LoadTrigger doesn't allow filling non controlled tools
-function courseplay:getIsActivatable(superFunc,objectToFill)
-	--when the trigger is filling, it uses this function without objectToFill
-	if objectToFill ~= nil then
-		local vehicle = objectToFill:getRootVehicle()
-		if objectToFill:getIsCourseplayDriving() or (vehicle~= nil and vehicle:getIsCourseplayDriving()) then
-			--if i'm in the vehicle, all is good and I can use the normal function, if not, i have to cheat:
-			if g_currentMission.controlledVehicle ~= vehicle then
-				local oldControlledVehicle = g_currentMission.controlledVehicle;
-				g_currentMission.controlledVehicle = vehicle or objectToFill;
-				local result = superFunc(self,objectToFill);
-				g_currentMission.controlledVehicle = oldControlledVehicle;
-				return result;
-			end
-		end
-	end
-	return superFunc(self,objectToFill);
-end
-LoadTrigger.getIsActivatable = Utils.overwrittenFunction(LoadTrigger.getIsActivatable,courseplay.getIsActivatable)
 
 -- TODO: make these part of AIDriver
 

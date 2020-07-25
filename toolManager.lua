@@ -854,9 +854,10 @@ function courseplay:load_tippers(vehicle, allowedToDrive)
 	if vehicle.cp.tipperLoadMode == 1 and currentTrailer.cp.currentSiloTrigger ~= nil and not driveOn then
         local acceptedFillType = false;
 		local siloTrigger = currentTrailer.cp.currentSiloTrigger;
-		local fillTypeData = vehicle.cp.settings.siloSelectedFillType:getFillTypes()
-		if not siloTrigger.isLoading and (vehicle.cp.siloSelectedFillType==nil or vehicle.cp.siloSelectedFillType==FillType.UNKNOWN) then
+		local fillTypeData = vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver:getData()
+		if not siloTrigger.isLoading then
 			vehicle.cp.siloSelectedFillType = FillType.UNKNOWN
+			--should be a function in the rework !!
 			if fillTypeData then 
 				for _,data in ipairs(fillTypeData) do 
 					if data.runCounter >0 then 
@@ -866,6 +867,7 @@ function courseplay:load_tippers(vehicle, allowedToDrive)
 							if siloTrigger.source and  siloTrigger.source.getAllFillLevels then 
 								fillLevels, capacity = siloTrigger.source:getAllFillLevels(g_currentMission:getFarmId())
 							elseif siloTrigger.source and siloTrigger.source.getAllProvidedFillLevels then
+								--siloTrigger.extraParameter instead of siloTrigger.managerId
 								fillLevels, capacity = siloTrigger.source:getAllProvidedFillLevels(g_currentMission:getFarmId(), siloTrigger.managerId)
 							else
 								courseplay:debug('fillLevels not found !!', 2);
@@ -1256,10 +1258,10 @@ function courseplay:unload_tippers(vehicle, allowedToDrive,dt)
 								tipper:setDischargeState(Dischargeable.DISCHARGE_STATE_GROUND)
 							elseif ctt.animalHusbandry then
 								if ctt.animalHusbandry:getHasSpaceForTipping(tipper.cp.fillType) then
-									tipper:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT)
+							--		tipper:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT)
 								end
 							else	
-								tipper:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT) --tipper:toggleTipState(ctt, bestTipReferencePoint);
+							--	tipper:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT) --tipper:toggleTipState(ctt, bestTipReferencePoint);
 							end
 							courseplay:debug(nameNum(tipper)..": setDischargeState: "..tostring(bestTipReferencePoint).."  /unloadingTipper= "..tostring(tipper:getName()), 2);
 						end
@@ -2008,7 +2010,7 @@ function courseplay:getIsToolValidForCpMode(workTool,cpModeToCheck)
 		then
 			modeValid = true;
 		end
-	elseif cpModeToCheck == 8 and SpecializationUtil.hasSpecialization(FillTriggerVehicle, workTool.specializations) then
+	elseif cpModeToCheck == 8 and (SpecializationUtil.hasSpecialization(FillTriggerVehicle, workTool.specializations) or SpecializationUtil.hasSpecialization(Pipe, workTool.specializations) and SpecializationUtil.hasSpecialization(Trailer, workTool.specializations)) then
 		modeValid = true;
 
 	elseif cpModeToCheck == 9 and courseplay:hasShovel(workTool) then
