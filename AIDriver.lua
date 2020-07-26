@@ -133,7 +133,8 @@ AIDriver.myLoadingStates = {
 	IS_LOADING = {},
 	NOTHING = {},
 	APPROACH_TRIGGER = {},
-	IS_UNLOADING = {}
+	IS_UNLOADING = {},
+	DRIVE_NOW = {}
 }
 
 --- Create a new driver (usage: aiDriver = AIDriver(vehicle)
@@ -286,6 +287,7 @@ function AIDriver:stop(msgReference)
 	self:setInfoText(msgReference)
 	self.state = self.states.STOPPED
 	self.loadingState = self.states.NOTHING
+	self:forceStopLoading()
 end
 
 --- Stop the driver when the work is done. Could just dismiss at this point,
@@ -302,6 +304,10 @@ function AIDriver:continue()
 	-- can be stopped for various reasons and those can have different msgReferences, so
 	-- just remove all, if there's a condition which requires a message it'll call setInfoText() again anyway.
 	self:clearAllInfoTexts()
+	if self:isLoading() or self:isUnloading() then
+		self:forceStopLoading()
+		self.loadingState = self.states.DRIVE_NOW
+	end
 end
 
 --- Compatibility function for the legacy CP code so the course can be resumed
@@ -408,11 +414,8 @@ function AIDriver:driveCourse(dt)
 	if self.loadingState == self.states.APPROACH_TRIGGER then
 		self:setSpeed(self.vehicle.cp.speeds.approach)
 	end
-	if self.loadingState == self.states.IS_LOADING then
-		self:setSpeed(0)
-	end
 	
-	if self.loadingState == self.states.IS_UNLOADING then
+	if self:isLoading() or self:isUnloading() then
 		self:setSpeed(0)
 	end
 	
@@ -1822,11 +1825,34 @@ function AIDriver:checkProximitySensor(maxSpeed, allowedToDrive, moveForwards)
 end
 
 function AIDriver:setLoadingState(object,fillUnitIndex,fillType,trigger)
-	
+	if not self:ignoreTrigger() and not self:isLoading() then
+		self.loadingState=self.states.IS_LOADING
+		self:refreshHUD()
+	end
+end
+
+function AIDriver:isLoading()
+	if self.loadingState == self.states.IS_LOADING then
+		return true
+	end
+end
+
+function AIDriver:isUnloading()
+	if self.loadingState == self.states.IS_UNLOADING then
+		return true
+	end
+end
+
+function AIDriver:ignoreTrigger()
+	if self.loadingState == self.states.DRIVE_NOW then
+		return true
+	end
 end
 
 function AIDriver:resetLoadingState()
-	self.loadingState=self.states.NOTHING
+	if not self:ignoreTrigger() then 
+		self.loadingState=self.states.NOTHING
+	end
 	self.fillableObject = nil
 end
 
@@ -1836,20 +1862,66 @@ function AIDriver:setInTriggerRange()
 	end
 end
 
-function AIDriver:setUnloadingState()
-	self.loadingState=self.states.IS_UNLOADING
+function AIDriver:setUnloadingState(object)
+	if object then 
+		self.fillableObject = {}
+		self.fillableObject.object = object
+	else
+		self.fillableObject = nil
+	end
+	if not self:ignoreTrigger() then
+		self.loadingState=self.states.IS_UNLOADING
+		self:refreshHUD()
+	end
 end
 
 function AIDriver:resetUnloadingState()
-	self.loadingState=self.states.NOTHING
+	if not self:ignoreTrigger() then
+		self.loadingState=self.states.NOTHING
+	end
+	self.fillableObject = nil
 end
 
-function AIDriver:isInFirstLoadingTrigger(triggerId)
-	if self.currentTriggerID == triggerId then
-		return 
+function AIDriver:countTriggerUp(object)
+	if self.activeTriggers ==nil then
+		self.activeTriggers = {}
+		self.loadingState = self.states.NOTHING
 	end
-	if self.currentTriggerID == nil and triggerId then
-		self.currentTriggerID = triggerId
+	if object then
+		self.activeTriggers[object] = true
 	end
 end
 
+function AIDriver:countTriggerDown(object)
+	if self.activeTriggers == nil then
+		self.activeTriggers = {}
+	end
+	if object then
+		self.activeTriggers[object] = false
+	end
+	for object,bool in pairs(self.activeTriggers) do 
+		if bool then 
+			return
+		end
+	end
+	self.activeTriggers =nil
+	self.loadingState = self.states.NOTHING
+end
+
+function AIDriver:forceStopLoading()
+	if self.fillableObject then 
+		if self.fillableObject.trigger then 
+			if self.fillableObject.trigger:isa(Vehicle) then --disable filling at Augerwagons
+				--TODO!!
+			else --disable filling at LoadingTriggers
+				self.fillableObject.trigger:setIsLoading(false)
+			end
+		else 
+			if self:isLoading() then -- disable filling at fillTriggers
+				self.fillableObject.object:setFillUnitIsFilling(false)
+			else -- disable unloading
+				self.fillableObject.object:setDischargeState(Dischargeable.DISCHARGE_STATE_OFF)
+			end
+		end
+	end
+end

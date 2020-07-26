@@ -59,9 +59,13 @@ end
 --- Drive the refill part of the course
 function FillableFieldworkAIDriver:driveUnloadOrRefill()
 	local isNearWaitPoint, waitPointIx = self.course:hasWaitPointWithinDistance(self.ppc:getCurrentWaypointIx(), 5)
-	
-	courseplay:isTriggerAvailable(self.vehicle)
-	
+	if self:is_a(FieldSupplyAIDriver) then
+		if not isNearWaitPoint then
+			courseplay:isTriggerAvailable(self.vehicle)
+		end
+	else
+		courseplay:isTriggerAvailable(self.vehicle)
+	end
 	if self.course:isTemporary() then
 		-- use the courseplay speed limit until we get to the actual unload corse fields (on alignment/temporary)
 		self:setSpeed(self.vehicle.cp.speeds.field)
@@ -117,8 +121,11 @@ end
 function FillableFieldworkAIDriver:continue()
 	self:debug('Continuing...')
 	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
-	self.loadingState = self.states.NOTHING
 	self.refillState = self.states.REFILL_DONE	
+	if self:isLoading() or self:isUnloading() then
+		self:forceStopLoading()
+		self.loadingState = self.states.DRIVE_NOW
+	end
 	self:clearAllInfoTexts()
 end
 
@@ -130,11 +137,10 @@ function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 	local siloSelectedFillTypeData = nil
 	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-	elseif self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+	end
+	if self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
 		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-	else
-		--diff driver...
-	end	
+	end
 	local fillTypeData = nil
 	if siloSelectedFillType then
 		fillTypeData = siloSelectedFillType:getData()
@@ -246,7 +252,7 @@ function FillableFieldworkAIDriver:setLoadingState(object,fillUnitIndex,fillType
 	else
 		self.fillableObject = nil
 	end
-	self.loadingState=self.states.IS_LOADING
+	AIDriver.setLoadingState(self)
 end
 
 function FillableFieldworkAIDriver:isFilledUntilPercantageX(currentFillType,maxFillLevel)
@@ -266,11 +272,10 @@ function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
 	local siloSelectedFillTypeData = nil
 	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-	elseif self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+	end
+	if self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
 		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-	else
-		--diff driver...
-	end	
+	end
 	local fillTypeData = nil
 	if siloSelectedFillType then
 		fillTypeData = siloSelectedFillType:getData()

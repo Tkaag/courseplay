@@ -34,7 +34,7 @@ function FieldSupplyAIDriver:init(vehicle)
 	FillableFieldworkAIDriver.init(self, vehicle)
 	self:initStates(FieldSupplyAIDriver.myStates)
 	self.supplyState = self.states.ON_REFILL_COURSE
-	--self.mode = courseplay.MODE_BUNKERSILO_COMPACTER
+	self.mode=courseplay.MODE_FIELD_SUPPLY 
 	self:setHudContent()
 end
 
@@ -70,10 +70,12 @@ function FieldSupplyAIDriver:drive(dt)
 	elseif self.supplyState == self.states.WAITING_FOR_GETTING_UNLOADED then
 		self:stopAndWait(dt)
 		-- unload into a FRC if there is one
+		courseplay:isUnloadingTriggerAvailable(self.vehicle)
 	--	AIDriver.tipIntoStandardTipTrigger(self)
 		--if i'm empty or fillLevel is below threshold then drive to get new stuff
 		if self:isFillLevelToContinueReached() then
 			self:continue()
+			self.loadingState = self.states.NOTHING
 		end
 	end
 end
@@ -81,6 +83,11 @@ end
 function FieldSupplyAIDriver:continue()
 	self:changeSupplyState(self.states.ON_REFILL_COURSE )
 	self.state = self.states.RUNNING
+	if self:isUnloading() then
+		self.activeTriggers=nil
+	end
+	self.loadingState = self.states.DRIVE_NOW
+	self:forceStopLoading()
 end
 
 function FieldSupplyAIDriver:onWaypointPassed(ix)
@@ -92,9 +99,7 @@ function FieldSupplyAIDriver:onWaypointPassed(ix)
 	elseif self.course:isWaitAt(ix) then
 		-- show continue button
 		self.state = self.states.STOPPED
-		self:refreshHUD()
 		self:changeSupplyState(self.states.WAITING_FOR_GETTING_UNLOADED)
-
 	end
 end
 
@@ -103,12 +108,24 @@ function FieldSupplyAIDriver:changeSupplyState(newState)
 end
 
 function FieldSupplyAIDriver:isFillLevelToContinueReached()
+	siloSelectedFillTypeData = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
+	local fillTypeData = nil
+	if siloSelectedFillTypeData then
+		fillTypeData = siloSelectedFillTypeData:getData()
+	end
+	if fillTypeData == nil then
+		return
+	end
 	local fillLevelInfo = {}
 	self:getAllFillLevels(self.vehicle, fillLevelInfo)
-	for fillType, info in pairs(fillLevelInfo) do
-		local fillLevelPercentage = info.fillLevel/info.capacity*100
-		if fillLevelPercentage < self.vehicle.cp.driveOnAtFillLevel and self:levelDidNotChange(fillLevelPercentage) then
-			return true
+	for fillType, info in pairs(fillLevelInfo) do	
+		for _,data in ipairs(fillTypeData) do
+			if data.fillType == fillType then
+				local fillLevelPercentage = info.fillLevel/info.capacity*100
+				if fillLevelPercentage <= self.vehicle.cp.driveOnAtFillLevel and self:levelDidNotChange(fillLevelPercentage) then
+					return true
+				end
+			end
 		end
 	end
 end

@@ -35,12 +35,16 @@ function courseplay:unloadingTriggerCallback(superFunc,triggerId, otherId, onEnt
 				end
 			end
 		end
+		
 		if onLeave then
+			rootVehicle.cp.driver:countTriggerDown(fillableObject)
 			courseplay.debugFormat(2,"unloadingTriggerCallback onLeave")
+		else
+			rootVehicle.cp.driver:countTriggerUp(fillableObject)
 		end
 	end
 	if fillableObject and fillableObject.spec_fillUnit then
-		if onLeave then 
+		if onLeave then 		
 			SpecializationUtil.raiseEvent(fillableObject, "onRemovedFillUnitTrigger",#fillableObject.spec_fillUnit.fillTrigger.triggers)
 			courseplay.debugFormat(2,"close Cover of fillableObject")
 		end
@@ -54,11 +58,13 @@ function courseplay:setFillUnitIsFilling(superFunc,isFilling, noEventSend)
 	local rootVehicle = self:getRootVehicle()
 	if rootVehicle and courseplay:checkAIDriver(rootVehicle) then 
 		local siloSelectedFillType = nil
-		if rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then--FillableFieldWorkDriver
+		if rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 			siloSelectedFillType = rootVehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-		elseif rootVehicle.cp.driver:is_a(FieldSupplyAIDriver) then--FieldSupplyDriver
+		end
+		if rootVehicle.cp.driver:is_a(FieldSupplyAIDriver) then
 			siloSelectedFillType = rootVehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-		else
+		end
+		if siloSelectedFillType == nil then
 			return superFunc(self,isFilling, noEventSend)
 		end	
 		local fillTypeData = siloSelectedFillType:getData()
@@ -122,7 +128,7 @@ function courseplay:isTriggerAvailable(vehicle)
 			local callback = {}		
 			if object:isa(LoadTrigger) then 
 				courseplay:activateTriggerForVehicle(object, vehicle,callback)
-				if courseplay:handleLoadTriggerCallback(vehicle,callback) then 
+				if courseplay.handleLoadTriggerCallback(vehicle,callback) then 
 					g_currentMission.activatableObjects[key] = nil
 				end
 				return
@@ -139,14 +145,14 @@ function courseplay:checkFillTriggers(object)
 		local spec = object.spec_fillUnit
 		local coverSpec = object.spec_cover	
 		if spec.fillTrigger and #spec.fillTrigger.triggers>0 then
-			if coverSpec and coverSpec.isDirty then 
-				local rootVehicle = object:getRootVehicle()
-				if rootVehicle and rootVehicle.cp and rootVehicle.cp.driver and rootVehicle:getIsCourseplayDriving() and rootVehicle.cp.driver:isActive() then 
-					rootVehicle.cp.driver:setLoadingState()
+			local rootVehicle = object:getRootVehicle()
+			if not rootVehicle.cp.driver:ignoreTrigger() and not spec.fillTrigger.isFilling then	
+				if coverSpec and coverSpec.isDirty then 
+					courseplay.debugFormat(2,"cover is still opening wait!")
+				else
+					object:setFillUnitIsFilling(true)
 				end
-				courseplay.debugFormat(2,"cover is still opening wait!")
-			else	
-				object:setFillUnitIsFilling(true)
+				rootVehicle.cp.driver:setLoadingState()
 			end
 		end
 	end
@@ -160,12 +166,15 @@ end
 function courseplay:isUnloadingTriggerAvailable(object)    
 	local spec = object.spec_dischargeable
 	local rootVehicle = object:getRootVehicle()
-	if spec then 
+	if rootVehicle and spec then 
 		if spec:getCanToggleDischargeToObject() then 
 			local currentDischargeNode = spec.currentDischargeNode
 			if currentDischargeNode.dischargeObject then 
+				rootVehicle.cp.driver:countTriggerUp(object)
 				rootVehicle.cp.driver:setInTriggerRange()
-			end			
+			else
+				rootVehicle.cp.driver:countTriggerDown(object)
+			end
 			if currentDischargeNode and spec.currentDischargeState == Dischargeable.DISCHARGE_STATE_OFF then
 				if not spec:getCanDischargeToObject(currentDischargeNode) then
 					for i=1,#spec.dischargeNodes do
@@ -177,10 +186,15 @@ function courseplay:isUnloadingTriggerAvailable(object)
 					end
 				end
 				if spec:getCanDischargeToObject(currentDischargeNode) and not rootVehicle.cp.driver:isNearFillPoint() then
+					if not object:getFillUnitFillType(currentDischargeNode.fillUnitIndex) or rootVehicle.cp.driver:ignoreTrigger() then 
+						return
+					end
 					spec:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT)				
-					rootVehicle.cp.driver:setUnloadingState()
+					rootVehicle.cp.driver:setUnloadingState(object)
 				end
 			end
+		else
+			rootVehicle.cp.driver:countTriggerDown(object)
 		end
 	end
 	for _,impl in pairs(object:getAttachedImplements()) do
@@ -189,13 +203,16 @@ function courseplay:isUnloadingTriggerAvailable(object)
 end
 
 --CP callbacks for LoadingTriggers
-function courseplay:handleLoadTriggerCallback(vehicle,callback)
+function courseplay.handleLoadTriggerCallback(vehicle,callback)
 	if callback.startLoading then
 		return true
 	end
 	if callback.full then
 		return 
 	end
+	if callback.ignoreTrigger then 
+		return
+	end	
 	if callback.waitingForCover then 
 		return
 	end	
@@ -220,7 +237,8 @@ function courseplay:handleLoadTriggerCallback(vehicle,callback)
 	end
 	if callback.fail then 
 		--TODO ??
-		CpManager:setGlobalInfoText(vehicle, 'FARM_SILO_NO_FILLTYPE');
+		print("fail")
+		--CpManager:setGlobalInfoText(vehicle, 'FARM_SILO_NO_FILLTYPE');
 		return 
 	end	
 	return 
@@ -232,10 +250,16 @@ function courseplay:onActivateObject(superFunc,vehicle,callback)
 		local siloSelectedFillType = nil
 		if vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 			siloSelectedFillType = vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-		elseif vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+		end
+		if vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
 			siloSelectedFillType = vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-		else
+		end
+		if siloSelectedFillType == nil then
 			return superFunc(self)
+		end	
+		if vehicle.cp.driver:ignoreTrigger() then 
+			callback.ignoreTrigger = true
+			return
 		end
 		if not self.isLoading then
 			local fillLevels, capacity
@@ -266,7 +290,8 @@ function courseplay:onActivateObject(superFunc,vehicle,callback)
 										return
 									end
 									if fillableObject:getFillUnitCapacity(fillUnitIndex) <=0 then
-									
+										callback.full=true
+										vehicle.cp.driver:resetLoading()
 									else
 										self:onFillTypeSelection(fillTypeIndex)
 										callback.startLoading = true
@@ -295,7 +320,7 @@ function courseplay:onActivateObject(superFunc,vehicle,callback)
 			callback.fail = true
 		end
 	else 
-		return superFunc(self,vehicle)
+		return superFunc(self)
 	end
 end
 LoadTrigger.onActivateObject = Utils.overwrittenFunction(LoadTrigger.onActivateObject,courseplay.onActivateObject)
@@ -314,6 +339,7 @@ function courseplay:setIsLoading(superFunc,isLoading, targetObject, fillUnitInde
 			rootVehicle.cp.driver:resetLoadingState()
 			courseplay.debugFormat(2, 'LoadTrigger resetLoading and close Cover')
 			SpecializationUtil.raiseEvent(self.validFillableObject, "onRemovedFillUnitTrigger",#self.validFillableObject.spec_fillUnit.fillTrigger.triggers)
+			 g_currentMission:addActivatableObject(self)
 		end
 	end
 	return superFunc(self,isLoading, targetObject, fillUnitIndex, fillType, noEventSend)
@@ -332,13 +358,11 @@ function courseplay:loadTriggerCallback(triggerId, otherId, onEnter, onLeave, on
 	end
 	if courseplay:checkAIDriver(rootVehicle) then
 		continue =true
-		if not rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) and not rootVehicle.cp.driver:is_a(FieldSupplyAIDriver) then
-	--		return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
+		if not rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 			continue = false
 		end
 		if continue and onEnter then 
 			courseplay.debugFormat(2, 'LoadTrigger onEnter')
-			rootVehicle.cp.driver:setInTriggerRange()
 			if fillableObject.getFillUnitIndexFromNode ~= nil then
 				local fillLevels, capacity
 				if self.source.getAllFillLevels then
@@ -350,7 +374,7 @@ function courseplay:loadTriggerCallback(triggerId, otherId, onEnter, onLeave, on
 					local foundFillUnitIndex = fillableObject:getFillUnitIndexFromNode(otherId)
 					for fillTypeIndex, fillLevel in pairs(fillLevels) do
 						if fillableObject:getFillUnitSupportsFillType(foundFillUnitIndex, fillTypeIndex) then
-							if fillableObject:getFillUnitAllowsFillType(foundFillUnitIndex, fillTypeIndex) then
+							if fillableObject:getFillUnitAllowsFillType(foundFillUnitIndex, fillTypeIndex) and fillableObject.spec_cover then
 								SpecializationUtil.raiseEvent(fillableObject, "onAddedFillUnitTrigger",fillTypeIndex,foundFillUnitIndex,1)
 								courseplay.debugFormat(2, 'open Cover for loading')
 							end
@@ -360,11 +384,17 @@ function courseplay:loadTriggerCallback(triggerId, otherId, onEnter, onLeave, on
 			end
 		end
 		if continue and onLeave then
-			courseplay.debugFormat(2, 'LoadTrigger onLeave')
+			rootVehicle.cp.driver:countTriggerDown(fillableObject)
+			spec = fillableObject.spec_fillUnit
+			if spec then
+				SpecializationUtil.raiseEvent(fillableObject, "onRemovedFillUnitTrigger",#spec.fillTrigger.triggers)
+			end
+			courseplay.debugFormat(2,"LoadTrigger onLeave")
+		elseif continue then
+			rootVehicle.cp.driver:countTriggerUp(fillableObject)
+			rootVehicle.cp.driver:setInTriggerRange()
 		end
-		--rootVehicle.cp.driver:isInFirstLoadingTrigger(triggerId)
 	end
---	return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
 end
 LoadTrigger.loadTriggerCallback = Utils.appendedFunction(LoadTrigger.loadTriggerCallback,courseplay.loadTriggerCallback)
 
@@ -380,10 +410,14 @@ function courseplay:fillTriggerCallback(superFunc, triggerId, otherActorId, onEn
 			return superFunc(self,triggerId, otherActorId, onEnter, onLeave, onStay, otherShapeId)
 		end		
 		if onEnter then
-			rootVehicle.cp.driver:setInTriggerRange()
 			courseplay.debugFormat(2, 'fillTrigger onEnter')
-		elseif onLeave then
+		end
+		if onLeave then
+			rootVehicle.cp.driver:countTriggerDown(fillableObject)
 			courseplay.debugFormat(2, 'fillTrigger onLeave')
+		else
+			rootVehicle.cp.driver:countTriggerUp(fillableObject)
+			rootVehicle.cp.driver:setInTriggerRange()
 		end
 	end
 	return superFunc(self,triggerId, otherActorId, onEnter, onLeave, onStay, otherShapeId)
