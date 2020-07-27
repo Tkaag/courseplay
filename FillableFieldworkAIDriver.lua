@@ -33,13 +33,16 @@ FillableFieldworkAIDriver.myStates = {
 }
 
 function FillableFieldworkAIDriver:init(vehicle)
-	courseplay.debugVehicle(11,vehicle,'CombineUnloadAIDriver:init()')
+	courseplay.debugVehicle(11,vehicle,'FillableFieldworkAIDriver:init()')
 	FieldworkAIDriver.init(self, vehicle)
 	self:initStates(FillableFieldworkAIDriver.myStates)
 	self.mode = courseplay.MODE_SEED_FERTILIZE
 	self.refillState = self.states.TO_BE_REFILLED
 end
-
+function FillableFieldworkAIDriver:start(startingPoint)
+	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
+	FieldworkAIDriver.start(self,startingPoint)
+end
 function FillableFieldworkAIDriver:setHudContent()
 	FieldworkAIDriver.setHudContent(self)
 	courseplay.hud:setFillableFieldworkAIDriverContent(self.vehicle)
@@ -58,9 +61,17 @@ end
 
 --- Drive the refill part of the course
 function FillableFieldworkAIDriver:driveUnloadOrRefill()
+	if self:getSiloSelectedFillTypeSetting():isEmpty() then 
+		self:setSpeed(0)
+		self:setInfoText('NO_SELECTED_FILLTYPE')
+		return
+	else
+		self:clearInfoText('NO_SELECTED_FILLTYPE')
+	end
 	local isNearWaitPoint, waitPointIx = self.course:hasWaitPointWithinDistance(self.ppc:getCurrentWaypointIx(), 5)
+	self.waitPointIx = waitPointIx
 	if self:is_a(FieldSupplyAIDriver) then
-		if not isNearWaitPoint then
+		if not isNearWaitPoint or not (self.waitPointIx and self.waitPointIx+5 >self.ppc:getCurrentWaypointIx())  then
 			courseplay:isTriggerAvailable(self.vehicle)
 		end
 	else
@@ -70,15 +81,11 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 		-- use the courseplay speed limit until we get to the actual unload corse fields (on alignment/temporary)
 		self:setSpeed(self.vehicle.cp.speeds.field)
 	elseif  self.refillState == self.states.TO_BE_REFILLED and isNearWaitPoint then
-		local allowedToDrive = true;
 		local distanceToWait = self.course:getDistanceBetweenVehicleAndWaypoint(self.vehicle, waitPointIx)
 		self:setSpeed(MathUtil.clamp(distanceToWait,self.vehicle.cp.speeds.crawl,self:getRecordedSpeed()))
 		if distanceToWait < 1 then
-			allowedToDrive = self:fillAtWaitPoint()
+			self:fillAtWaitPoint()
 		end	
-		if not allowedToDrive then
-			self:setSpeed(0)
-		end
 	else
 		-- just drive normally
 		self:setSpeed(self:getRecordedSpeed())
@@ -91,31 +98,49 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 			courseplay:setInfoText(self.vehicle, string.format("COURSEPLAY_LOADING_AMOUNT;%d;%d",math.floor(fillLevel),fillCapacity))
 		end
 	end	
-	return false
 end
 
 function FillableFieldworkAIDriver:fillAtWaitPoint()
-	local vehicle = self.vehicle
-	local allowedToDrive = false
-	courseplay:setInfoText(vehicle, string.format("COURSEPLAY_LOADING_AMOUNT;%d;%d",courseplay.utils:roundToLowerInterval(vehicle.cp.totalFillLevel, 100),vehicle.cp.totalCapacity));
-	self:setInfoText('WAIT_POINT')
-	courseplay:openCloseCover(vehicle, not courseplay.SHOW_COVERS)
-	--fillLevel changed in last loop-> start timer
-	if self.prevFillLevelPct == nil or self.prevFillLevelPct ~= vehicle.cp.totalFillLevelPercent then
-		self.prevFillLevelPct = vehicle.cp.totalFillLevelPercent
-		courseplay:setCustomTimer(vehicle, "fillLevelChange", 7);
+	local fillLevelInfo = {}
+	self:getAllFillLevels(self.vehicle, fillLevelInfo)
+	local fillTypeData, fillTypeDataSize= self:getSiloSelectedFillTypeData()
+	if fillTypeData == nil then
+		return
 	end
-	
-	--if time is up and no fillLevel change happend, check whether we may drive on or not
-	if courseplay:timerIsThrough(vehicle, "fillLevelChange",false) then
-		if vehicle.cp.totalFillLevelPercent >= vehicle.cp.refillUntilPct then
-			self:continue()
-			courseplay:resetCustomTimer(vehicle, "fillLevelChange",true);
-			self.prevFillLevelPct = nil
-			courseplay:openCloseCover(vehicle, courseplay.SHOW_COVERS)
+	self:setLoadingState()
+	if self.prevTotalFillAmount == nil then
+		self.prevTotalFillAmount = 0
+		for fillType, info in pairs(fillLevelInfo) do
+			for _,data in ipairs(fillTypeData) do
+				if data.fillType == fillType then
+					self.prevTotalFillAmount = self.prevTotalFillAmount+info.capacity
+				end
+			end
+		end
+	else
+		local newTotal = 0
+		for fillType, info in pairs(fillLevelInfo) do
+			for _,data in ipairs(fillTypeData) do
+				if data.fillType == fillType then
+					newTotal = newTotal+info.capacity
+				end
+			end
+		end
+		if self.prevTotalFillAmount ~= newTotal then
+			courseplay:setCustomTimer(vehicle, "fillLevelChange", 7)
+			self.prevTotalFillAmount = newTotal
+		else
+			if courseplay:timerIsThrough(vehicle, "fillLevelChange",false) then
+				if self:areFillLevelsOk() then
+					self:continue()
+					courseplay:resetCustomTimer(vehicle, "fillLevelChange",true);
+					self.prevFillLevelPct = nil
+				end
+			end
+			
 		end
 	end
-	return allowedToDrive
+	self:setInfoText('WAIT_POINT')
 end
 
 function FillableFieldworkAIDriver:continue()
@@ -134,16 +159,9 @@ end
 function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 	local allOk = true
 	local hasSeeds, hasNoFertilizer = false, false
-	local siloSelectedFillTypeData = nil
-	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
-		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-	end
-	if self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
-		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-	end
-	local fillTypeData = nil
-	if siloSelectedFillType then
-		fillTypeData = siloSelectedFillType:getData()
+	local fillTypeData, fillTypeDataSize= self:getSiloSelectedFillTypeData()
+	if fillTypeData == nil then
+		return
 	end
 	for fillType, info in pairs(fillLevelInfo) do
 		if self:isValidFillType(fillType) and info.fillLevel == 0 and info.capacity > 0 and not self:helperBuysThisFillType(fillType) then
@@ -269,21 +287,12 @@ function FillableFieldworkAIDriver:isFilledUntilPercantageX(currentFillType,maxF
 end
 
 function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
-	local siloSelectedFillTypeData = nil
-	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
-		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
-	end
-	if self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
-		siloSelectedFillType = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-	end
-	local fillTypeData = nil
-	if siloSelectedFillType then
-		fillTypeData = siloSelectedFillType:getData()
-	end
+	local fillTypeData, fillTypeDataSize= self:getSiloSelectedFillTypeData()
 	if fillTypeData == nil then
 		return
 	end
 	local fillLevelInfo = {}
+	local okFillTypes = 0
 	self:getAllFillLevels(self.vehicle, fillLevelInfo)
 	for fillType, info in pairs(fillLevelInfo) do	
 		if fillTypeData then 
@@ -292,19 +301,35 @@ function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
 					local fillLevelPercentage = info.fillLevel/info.capacity*100
 					if data.maxFillLevel and fillLevelPercentage >= data.maxFillLevel then 
 						if self.fillableObject and self.fillableObject.fillType == fillType then
-							if self.fillableObject.trigger then 
-								if self.fillableObject.trigger:isa(Vehicle) then --disable filling at Augerwagons
-									--TODO!!
-								else --disable filling at LoadingTriggers
-									self.fillableObject.trigger:setIsLoading(false)
-								end
-							else -- disable filling at fillTriggers
-								self.fillableObject.object:setFillUnitIsFilling(false)
-							end
+							self:forceStopLoading()
 						end
+						okFillTypes=okFillTypes+1
 					end
 				end
 			end
 		end
+	end
+	if okFillTypes == #fillTypeData then 
+		return true
+	end
+end
+
+function FillableFieldworkAIDriver:getSiloSelectedFillTypeSetting()
+	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
+		siloSelectedFillTypeSetting = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
+	end
+	if self.vehicle.cp.driver:is_a(FieldSupplyAIDriver) then
+		siloSelectedFillTypeSetting = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
+	end
+	return siloSelectedFillTypeSetting
+end
+
+function FillableFieldworkAIDriver:getSiloSelectedFillTypeData()
+	local siloSelectedFillTypeSetting = self:getSiloSelectedFillTypeSetting()
+	
+	if siloSelectedFillTypeSetting then
+		local fillTypeData = siloSelectedFillTypeSetting:getData()
+		local size = siloSelectedFillTypeSetting:getSize()
+		return fillTypeData,size
 	end
 end

@@ -928,6 +928,9 @@ function CpManager:setupGlobalInfoText()
 		WEATHER						= { level =  0, text = 'COURSEPLAY_WEATHER_WARNING' };
 		WEIGHING_VEHICLE			= { level =  0, text = 'COURSEPLAY_IS_BEING_WEIGHED' };
 		WORK_END					= { level =  1, text = 'COURSEPLAY_WORK_END' };
+		REACHED_OVERLOADING_POINT	= { level =  0, text = 'COURSEPLAY_REACHED_OVERLOADING_POINT' };
+		NO_SELECTED_FILLTYPE		= { level =  0, text = 'COURSEPLAY_NO_SELECTED_FILLTYPE' };
+
 	};
 end;
 

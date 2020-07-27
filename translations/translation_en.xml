@@ -470,6 +470,9 @@
 		<text name="COURSEPLAY_ALLOW_REVERSE_FOR_PATHFINDING_IN_TURNS"	   	text="Reversing for pathfinding in turns" />
 		<text name="COURSEPLAY_ALLOW_REVERSE_FOR_PATHFINDING_IN_TURNS_TOOLTIP"	text="Allow finding a turn path which needs reverse driving (with non-towed implements only)" />
 		
+		<text name="COURSEPLAY_NO_SELECTED_FILLTYPE"						text="no fillType selected!" />
+		<text name="COURSEPLAY_ADD_FILLTYPE"								text="add new fillType" />
+		
 		<!-- Replace marker, do not remove! -->
 	</texts>
 </l10n>

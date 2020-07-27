@@ -44,6 +44,7 @@ end
 
 function FieldSupplyAIDriver:start(startingPoint)
 	self:beforeStart()
+	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
 	self.course = Course(self.vehicle, self.vehicle.Waypoints)
 	self.ppc:setCourse(self.course)
 	local ix = self.course:getStartingWaypointIx(AIDriverUtil.getDirectionNode(self.vehicle), startingPoint)
@@ -62,13 +63,14 @@ end
 
 function FieldSupplyAIDriver:drive(dt)
 	-- update current waypoint/goal point
-	self.allowedToDrive = true
-	courseplay:updateFillLevelsAndCapacities(self.vehicle)
 	if self.supplyState == self.states.ON_REFILL_COURSE  then
+		self:clearInfoText('REACHED_OVERLOADING_POINT')
 		FillableFieldworkAIDriver.driveUnloadOrRefill(self)
 		AIDriver.drive(self, dt)
 	elseif self.supplyState == self.states.WAITING_FOR_GETTING_UNLOADED then
 		self:stopAndWait(dt)
+		self:setInfoText('REACHED_OVERLOADING_POINT')
+		self:updateInfoText()
 		-- unload into a FRC if there is one
 		courseplay:isUnloadingTriggerAvailable(self.vehicle)
 	--	AIDriver.tipIntoStandardTipTrigger(self)
@@ -108,11 +110,7 @@ function FieldSupplyAIDriver:changeSupplyState(newState)
 end
 
 function FieldSupplyAIDriver:isFillLevelToContinueReached()
-	siloSelectedFillTypeData = self.vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver
-	local fillTypeData = nil
-	if siloSelectedFillTypeData then
-		fillTypeData = siloSelectedFillTypeData:getData()
-	end
+	local fillTypeData, fillTypeDataSize= self:getSiloSelectedFillTypeData()
 	if fillTypeData == nil then
 		return
 	end
@@ -122,7 +120,7 @@ function FieldSupplyAIDriver:isFillLevelToContinueReached()
 		for _,data in ipairs(fillTypeData) do
 			if data.fillType == fillType then
 				local fillLevelPercentage = info.fillLevel/info.capacity*100
-				if fillLevelPercentage <= self.vehicle.cp.driveOnAtFillLevel and self:levelDidNotChange(fillLevelPercentage) then
+				if fillLevelPercentage <= self.vehicle.cp.settings.driveOnAtFillLevel:get() and self:levelDidNotChange(fillLevelPercentage) then
 					return true
 				end
 			end
@@ -146,7 +144,7 @@ function FieldSupplyAIDriver:levelDidNotChange(fillLevelPercent)
 	end
 end
 
+--TODO: figure out the usage of this one ??
 function FieldSupplyAIDriver:stopAndWait(dt)
 	AIVehicleUtil.driveInDirection(self.vehicle, dt, self.vehicle.cp.steeringAngle, 1, 0.5, 10, false, fwd, 0, 1, 0, 1)
 end
-

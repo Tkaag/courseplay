@@ -471,11 +471,6 @@ function courseplay:changeShieldHeight (vehicle, changeBy)
 	vehicle.cp.mode10.shieldHeight = MathUtil.clamp(vehicle.cp.mode10.shieldHeight + changeBy,0,1.5)
 end
 
-function courseplay:changeDriveOnAtFillLevel(vehicle, changeBy)
-	vehicle.cp.driveOnAtFillLevel = MathUtil.clamp(vehicle.cp.driveOnAtFillLevel + changeBy, 0, 100);
-end
-
-
 function courseplay:changeFollowAtFillLevel(vehicle, changeBy)
 	vehicle.cp.followAtFillLevel = MathUtil.clamp(vehicle.cp.followAtFillLevel + changeBy, 0, 100);
 end
@@ -1987,6 +1982,14 @@ function SettingList:setPrevious()
 	self:setToIx(new)
 end
 
+function SettingList:changeByX(x)
+	local ix = 1
+	if x<0 then
+		ix = -1
+	end
+	local new = self:checkAndSetValidValue(self.current + ix)
+	self:setToIx(new)
+end
 
 -- TODO: consolidate this with setNext()
 function SettingList:next()
@@ -2188,6 +2191,10 @@ function LinkedListSetting:getDataXtoY(x,y)
 	return self.List:getDataXtoY(x,y)
 end
 
+function LinkedListSetting:isEmpty()	
+	return self:getSize()<=0
+end
+
 function LinkedListSetting:onWriteStream(stream)
 	--override code
 end
@@ -2240,6 +2247,14 @@ function PercentageSettingList:init(name, label, toolTip, vehicle)
 		texts[i] = i.."%"
 	end
 	SettingList.init(self, name, label, toolTip, vehicle,values, texts)
+end
+
+function PercentageSettingList:checkAndSetValidValue(new)
+	if new <= #self.values and new > 0 then
+		return new
+	else
+		return self.current
+	end
 end
 
 --- AutoDrive mode setting
@@ -2854,7 +2869,7 @@ end
 ---@class SiloSelectedFillTypeSetting : LinkedListSetting
 SiloSelectedFillTypeSetting = CpObject(LinkedListSetting)
 function SiloSelectedFillTypeSetting:init(vehicle, mode)
-	LinkedListSetting.init(self, 'siloSelectedFillType'..mode, 'COURSEPLAY_FARM_SILO_FILL_TYPE', 'COURSEPLAY_FARM_SILO_FILL_TYPE', vehicle)
+	LinkedListSetting.init(self, 'siloSelectedFillType'..mode, 'COURSEPLAY_ADD_FILLTYPE', 'COURSEPLAY_ADD_FILLTYPE', vehicle)
 	self.mode = mode
 	self.MAX_RUNS = 20
 	self.MAX_PERCENT = 100
@@ -2915,6 +2930,8 @@ function SiloSelectedFillTypeSetting:fillTypeDataToAdd(selectedfillType)
 	end
 	return data
 end
+
+
 
 --TODO: maybe automate this one ?? on disconnect
 function SiloSelectedFillTypeSetting:cleanUpOldFillTypes()
@@ -3145,12 +3162,11 @@ function RefillUntilPctSetting:init(vehicle)
 	self:set(100)
 end
 
---not used right now!
 ---@class DriveOnAtFillLevelSetting : PercentageSettingList
 DriveOnAtFillLevelSetting = CpObject(PercentageSettingList)
 function DriveOnAtFillLevelSetting:init(vehicle)
 	PercentageSettingList.init(self, 'driveOnAtFillLevel', 'COURSEPLAY_DRIVE_ON_AT', 'COURSEPLAY_DRIVE_ON_AT', vehicle)
-	self:set(100)
+	self:set(90)
 end
 
 --seperate SiloSelectedFillTypeSettings to save their current state
@@ -3162,6 +3178,7 @@ GrainTransportDriver_SiloSelectedFillTypeSetting = CpObject(SiloSelectedFillType
 function GrainTransportDriver_SiloSelectedFillTypeSetting:init(vehicle)
 	SiloSelectedFillTypeSetting.init(self, vehicle, "GrainTransportDriver")
 	self.MAX_FILLTYPES = 5
+	self.disallowedFillTypes = {FillType.DEF,FillType.AIR}
 end
 
 ---@class FillableFieldWorkDriver_SiloSelectedFillTypeSetting : SiloSelectedFillTypeSetting

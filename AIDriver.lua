@@ -286,8 +286,10 @@ function AIDriver:stop(msgReference)
 	-- not much to do here, see the derived classes
 	self:setInfoText(msgReference)
 	self.state = self.states.STOPPED
+	if self:isLoading() or self:isUnloading() then
+		self:forceStopLoading()
+	end
 	self.loadingState = self.states.NOTHING
-	self:forceStopLoading()
 end
 
 --- Stop the driver when the work is done. Could just dismiss at this point,
@@ -375,10 +377,6 @@ function AIDriver:drive(dt)
 		self:hold()
 		self:continueIfWaitTimeIsOver()
 	end
-	if self.state == self.states.IS_LOADING then
-		self:hold()
-	end	
---	courseplay:isTriggerAvailable(self.vehicle)
 	self:driveCourse(dt)
 	self:drawTemporaryCourse()
 end
@@ -1824,6 +1822,7 @@ function AIDriver:checkProximitySensor(maxSpeed, allowedToDrive, moveForwards)
 	return newSpeed, allowedToDrive
 end
 
+--Driver set to wait while loading
 function AIDriver:setLoadingState(object,fillUnitIndex,fillType,trigger)
 	if not self:ignoreTrigger() and not self:isLoading() then
 		self.loadingState=self.states.IS_LOADING
@@ -1843,12 +1842,14 @@ function AIDriver:isUnloading()
 	end
 end
 
+--Driver set to ignore the current Trigger as "continue" was pressed
 function AIDriver:ignoreTrigger()
 	if self.loadingState == self.states.DRIVE_NOW then
 		return true
 	end
 end
 
+--Driver stops loading
 function AIDriver:resetLoadingState()
 	if not self:ignoreTrigger() then 
 		self.loadingState=self.states.NOTHING
@@ -1856,16 +1857,18 @@ function AIDriver:resetLoadingState()
 	self.fillableObject = nil
 end
 
+--Driver is in trigger range slow down
 function AIDriver:setInTriggerRange()
 	if self.loadingState==self.states.NOTHING then
 		self.loadingState=self.states.APPROACH_TRIGGER
 	end
 end
 
+--Driver set to wait while unloading
 function AIDriver:setUnloadingState(object)
 	if object then 
-		self.fillableObject = {}
-		self.fillableObject.object = object
+		self.fillableObject = {} 
+		self.fillableObject.object = object --used to enable self:forceStopLoading()
 	else
 		self.fillableObject = nil
 	end
@@ -1875,6 +1878,7 @@ function AIDriver:setUnloadingState(object)
 	end
 end
 
+--Driver stops unloading 
 function AIDriver:resetUnloadingState()
 	if not self:ignoreTrigger() then
 		self.loadingState=self.states.NOTHING
@@ -1882,6 +1886,7 @@ function AIDriver:resetUnloadingState()
 	self.fillableObject = nil
 end
 
+--countTriggerUp/countTriggerDown used to check current Triggers
 function AIDriver:countTriggerUp(object)
 	if self.activeTriggers ==nil then
 		self.activeTriggers = {}
@@ -1908,6 +1913,7 @@ function AIDriver:countTriggerDown(object)
 	self.loadingState = self.states.NOTHING
 end
 
+--force stop loading/ unloading if "continue" or stop is pressed
 function AIDriver:forceStopLoading()
 	if self.fillableObject then 
 		if self.fillableObject.trigger then 

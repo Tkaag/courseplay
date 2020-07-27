@@ -1005,9 +1005,9 @@ function courseplay.hud:updatePageContent(vehicle, page)
 					vehicle.cp.hud.content.pages[page][line][2].text = string.format('%dm', vehicle.cp.convoy.maxDistance);
 				
 				
-				elseif entry.functionToCall == 'changeDriveOnAtFillLevel' then
-					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_DRIVE_ON_AT');
-					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.driveOnAtFillLevel ~= nil and ('%d%%'):format(vehicle.cp.driveOnAtFillLevel) or '---';
+				elseif entry.functionToCall == 'driveOnAtFillLevel:changeByX' then
+					vehicle.cp.hud.content.pages[page][line][1].text = vehicle.cp.settings.driveOnAtFillLevel:getLabel()
+					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.settings.driveOnAtFillLevel:getText()
 				--TODO: setDriveNow and forceGoToUnloadCourse should be same !! 
 				elseif entry.functionToCall == 'setDriveNow' then
 					if not vehicle.cp.isRecording and not vehicle.cp.recordingIsPaused then
@@ -1138,13 +1138,7 @@ function courseplay.hud:updatePageContent(vehicle, page)
 					
 				elseif entry.functionToCall == 'changeFollowAtFillLevel' then	
 					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_START_AT');
-					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.followAtFillLevel ~= nil and ('%d%%'):format(vehicle.cp.followAtFillLevel) or '---';
-					
-				elseif entry.functionToCall == 'changeDriveOnAtFillLevel' then
-					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_DRIVE_ON_AT');
-					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.driveOnAtFillLevel ~= nil and ('%d%%'):format(vehicle.cp.driveOnAtFillLevel) or '---';
-
-					
+					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.followAtFillLevel ~= nil and ('%d%%'):format(vehicle.cp.followAtFillLevel) or '---';					
 				--[[elseif entry.functionToCall == 'toggleSearchCombineMode' then    --automatic or manual
 					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_COMBINE_SEARCH_MODE'); --always
 					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.searchCombineAutomatically and courseplay:loc('COURSEPLAY_AUTOMATIC_SEARCH') or courseplay:loc('COURSEPLAY_MANUAL_SEARCH');
@@ -1974,7 +1968,8 @@ function courseplay.hud:setupSiloSelectedFillTypeList(vehicle,setting, hudPage,s
 			courseplay.button:new(vehicle, hudPage, { 'iconSprite.png', 'navMinus' }, "decrementRunCounter",   i-diff, self.buttonPosX[5], self.linesButtonPosY[i], self.buttonSize.small.w, self.buttonSize.small.h, i, -5, false):setSetting(setting);
 			courseplay.button:new(vehicle, hudPage, { 'iconSprite.png', 'navPlus' },  "incrementRunCounter",   i-diff, self.buttonPosX[4], self.linesButtonPosY[i], self.buttonSize.small.w, self.buttonSize.small.h, i,  5, false):setSetting(setting);
 		end
-		courseplay.button:new(vehicle, hudPage, nil, "changeMaxFillLevel", i-diff, self.contentMinX, self.linesButtonPosY[i], self.contentMaxWidth, self.lineHeight, i, 5, true, true):setSetting(setting);
+		courseplay.button:new(vehicle, hudPage, nil, "changeMaxFillLevel", i-diff, self.contentMinX, self.linesButtonPosY[i], self.contentMaxWidth, self.lineHeight, i, 1, true, true):setSetting(setting);
+		
 		--vehicle.cp.hud.content.pages[hudPage][i][column].functionToCall = funct
 	end
 end
@@ -2458,10 +2453,9 @@ function courseplay.hud:setCombineUnloadAIDriverContent(vehicle)
 		
 	--page 8
 	self:enablePageButton(vehicle, 8)
-	
 	self:addSettingsRowWithArrows(vehicle,nil,'changeCombineOffset', 8, 1, 1 )
 	self:addSettingsRowWithArrows(vehicle,nil,'changeTipperOffset', 8, 2, 1 )
-	self:addSettingsRowWithArrows(vehicle,nil,'changeDriveOnAtFillLevel', 8, 3, 1 )
+	self:addSettingsRowWithArrows(vehicle,vehicle.cp.settings.driveOnAtFillLevel,'changeByX', 8, 3, 1 )
 	self:addSettingsRowWithArrows(vehicle,nil,'changeFollowAtFillLevel', 8, 4, 1 )
 	self:addRowButton(vehicle,vehicle.cp.settings.useRealisticDriving,'toggle', 8, 5, 1 )
 	self:addRowButton(vehicle,vehicle.cp.settings.turnOnField,'toggle', 8, 6, 1 )
@@ -2470,7 +2464,7 @@ function courseplay.hud:setCombineUnloadAIDriverContent(vehicle)
 end
 function courseplay.hud:setFieldSupplyAIDriverContent(vehicle)
 	self:enablePageButton(vehicle, 3)
-	self:addSettingsRowWithArrows(vehicle,nil,'changeDriveOnAtFillLevel', 3, 1, 1 )
+	self:addSettingsRowWithArrows(vehicle,vehicle.cp.settings.driveOnAtFillLevel,'changeByX', 3, 1, 1 )
 	self:addRowButton(vehicle,vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver,'addFilltype', 3, 2, 1 )
 	self:setupSiloSelectedFillTypeList(vehicle,vehicle.cp.settings.siloSelectedFillTypeFieldSupplyDriver, 3, 3, 4, 1)
 end

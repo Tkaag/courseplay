@@ -51,8 +51,6 @@ function GrainTransportAIDriver:drive(dt)
 	-- update current waypoint/goal point
 	self.ppc:update()
 
-	self:updateInfoText()
-
 	-- RESET TRIGGER RAYCASTS from drive.lua.
 	-- TODO: Not sure how raycast can be called twice if everything is coded cleanly.
 	self.vehicle.cp.hasRunRaycastThisLoop['tipTrigger'] = false
@@ -77,11 +75,20 @@ function GrainTransportAIDriver:drive(dt)
 	else
 		self:debug('Safety check failed')
 	end
-
+	
+	if self.vehicle.settings.siloSelectedFillTypeGrainTransportDriver:isEmpty() then 
+		allowedToDrive = false
+		self:setInfoText('NO_SELECTED_FILLTYPE')
+	else
+		self:clearInfoText('NO_SELECTED_FILLTYPE')
+	end
+	
 	-- TODO: clean up the self.allowedToDrives above and use a local copy
 	if self.state == self.states.STOPPED or not allowedToDrive then
 		self:hold()
 	end
+	
+	self:updateInfoText()
 
 	if giveUpControl then
 		-- unload_tippers does the driving

@@ -1100,7 +1100,7 @@ function CombineUnloadAIDriver:getFillLevelThreshold()
 end
 
 function CombineUnloadAIDriver:getDriveOnThreshold()
-	return self.vehicle.cp.driveOnAtFillLevel
+	return self.vehicle.cp.settings.driveOnAtFillLevel:get()
 end
 
 function CombineUnloadAIDriver:releaseUnloader()
