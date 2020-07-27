@@ -271,7 +271,7 @@ function courseplay:setIsLoading(superFunc,isLoading, targetObject, fillUnitInde
 			rootVehicle.cp.driver:resetLoadingState()
 			courseplay.debugFormat(2, 'LoadTrigger resetLoading and close Cover')
 			SpecializationUtil.raiseEvent(self.validFillableObject, "onRemovedFillUnitTrigger",#self.validFillableObject.spec_fillUnit.fillTrigger.triggers)
-			 g_currentMission:addActivatableObject(self)
+			g_currentMission:addActivatableObject(self)
 		end
 	end
 	return superFunc(self,isLoading, targetObject, fillUnitIndex, fillType, noEventSend)
@@ -369,88 +369,55 @@ FillUnit.setFillUnitIsFilling = Utils.overwrittenFunction(FillUnit.setFillUnitIs
 
 --Pipe callback used for augerwagons to open the cover on the fillableObject
 function courseplay:unloadingTriggerCallback(superFunc,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
-	local fillableObject = g_currentMission:getNodeObject(otherId)
-	local rootVehicle
-	if fillableObject then 
-		rootVehicle = fillableObject:getRootVehicle()
-	end
+	local rootVehicle = self:getRootVehicle()
 	if courseplay:checkAIDriver(rootVehicle) then 
-		if not rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
+		if not rootVehicle.cp.driver:is_a(FieldSupplyAIDriver) then
 			return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
 		end
-		if onEnter then 
-			courseplay.debugFormat(2,"unloadingTriggerCallback onEnter")
-			if fillableObject.spec_cover and fillableObject.getFillUnitIndexFromNode ~= nil then 
-				local fillUnitIndex = fillableObject:getFillUnitIndexFromNode(otherId)
+		local object = g_currentMission:getNodeObject(otherId)
+        if object ~= nil and object ~= self and object:isa(Vehicle) then
+            if onEnter and object.getFillUnitIndexFromNode ~= nil then
+                local fillUnitIndex = object:getFillUnitIndexFromNode(otherId)
                 if fillUnitIndex ~= nil then
-					local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
-					local fillType = nil
-					if dischargeNode ~= nil then
-                        fillType = self:getFillUnitFillType(dischargeNode.fillUnitIndex)
-					end
-					if fillType then 
-						local objectFillUnitIndex = fillableObject:getFirstValidFillUnitToFill(fillType)
-						if objectFillUnitIndex then
-							SpecializationUtil.raiseEvent(fillableObject, "onAddedFillUnitTrigger",fillType,objectFillUnitIndex,1)
-							courseplay.debugFormat(2,"open Cover of fillableObject")
+                    local spec = self.spec_pipe
+                    local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
+                    if dischargeNode ~= nil then
+                        local fillTypes = self:getFillUnitSupportedFillTypes(dischargeNode.fillUnitIndex)
+                        -- objects is only valid if it supports at least one of the harvesters fill types
+                        local objectSupportsFillType = false
+                        for fillType, _ in pairs(fillTypes) do
+                            if object:getFillUnitSupportsFillType(fillUnitIndex, fillType) then
+                                objectSupportsFillType = true
+                                break
+                            end
+                        end
+                        if objectSupportsFillType then
+							local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
+							if dischargeNode ~= nil then
+								local outputFillType = self:getFillUnitLastValidFillType(dischargeNode.fillUnitIndex)
+								SpecializationUtil.raiseEvent(object, "onAddedFillUnitTrigger",outputFillType,fillUnitIndex,1)
+							--	rootVehicle.cp.driver:setUnloadingState()
+							end
 						end
 					end
 				end
+			elseif onLeave then
+				SpecializationUtil.raiseEvent(object, "onRemovedFillUnitTrigger",0)
 			end
 		end
-		
 		if onLeave then
 			rootVehicle.cp.driver:countTriggerDown(fillableObject)
 			courseplay.debugFormat(2,"unloadingTriggerCallback onLeave")
 		else
 			rootVehicle.cp.driver:countTriggerUp(fillableObject)
 		end
-	end
-	if fillableObject and fillableObject.spec_fillUnit then
-		if onLeave then 		
-			SpecializationUtil.raiseEvent(fillableObject, "onRemovedFillUnitTrigger",#fillableObject.spec_fillUnit.fillTrigger.triggers)
-			courseplay.debugFormat(2,"close Cover of fillableObject")
+		if onEnter then 
+			courseplay.debugFormat(2,"unloadingTriggerCallback onEnter")
 		end
 	end
 	return superFunc(self,triggerId, otherId, onEnter, onLeave, onStay, otherShapeId)
 end
 Pipe.unloadingTriggerCallback = Utils.overwrittenFunction(Pipe.unloadingTriggerCallback,courseplay.unloadingTriggerCallback)
-
---Pipe onDischargeStateChanged => start/stop self and stop/start fillableObject
-function courseplay:onDischargeStateChanged(superFunc,state)
-	local rootVehicle = self:getRootVehicle()
-	if courseplay:checkAIDriver(rootVehicle) then
-		if not rootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
-			return superFunc(self,state)
-		end
-		local spec = self.spec_pipe
-		if spec.nearestObjectInTriggers.objectId then
-			local object = spec.nearestObjectInTriggers.objectId 
-			local fillUnitIndex = spec.nearestObjectInTriggers.fillUnitIndex 
-			local objectRootVehicle = nil 
-			local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
-			local fillType = nil
-			if dischargeNode then
-				local fillType = self:getFillUnitLastValidFillType(dischargeNode.fillUnitIndex)
-			end
-			if object and fillUnitIndex and fillType then 
-				objectRootVehicle = object:getRootVehicle()
-			end
-			if checkAIDriver(objectRootVehicle) then
-				if not objectRootVehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
-					return superFunc(self,state)
-				end
-				if state == Dischargeable.DISCHARGE_STATE_OFF then
-					objectRootVehicle.cp.driver:resetLoadingState()				
-				else  
-					objectRootVehicle.cp.driver:setLoadingState(object,fillUnitIndex, fillType,self)
-				end
-			end
-		end
-	end
-	return superFunc(self,state)
-end
-Pipe.onDischargeStateChanged = Utils.overwrittenFunction(Pipe.onDischargeStateChanged, courseplay.onDischargeStateChanged)
 
 --close cover after tipping if not closed already
 function courseplay:endTipping(superFunc,noEventSend)
@@ -464,6 +431,12 @@ function courseplay:endTipping(superFunc,noEventSend)
 	return superFunc(self,noEventSend)
 end
 Trailer.endTipping = Utils.overwrittenFunction(Trailer.endTipping,courseplay.endTipping)
+
+--function courseplay:onDeactivate(superFunc) 
+
+--	return superFunc(self)
+--end
+--Dischargeable.onDeactivate = Utils.overwrittenFunction(Dischargeable.onDeactivate,courseplay.onDeactivate)
 
 --check if the vehicle is controlled by courseplay
 function courseplay:checkAIDriver(rootVehicle) 

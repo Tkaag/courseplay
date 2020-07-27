@@ -358,7 +358,7 @@ function courseplay:updateWorkTools(vehicle, workTool, isImplement)
 
 	-- MODE 8: Field Supply
 	elseif vehicle.cp.mode == 8 then
-		if SpecializationUtil.hasSpecialization(FillTriggerVehicle, workTool.specializations) then
+		if SpecializationUtil.hasSpecialization(FillTriggerVehicle, workTool.specializations) or SpecializationUtil.hasSpecialization(Pipe, workTool.specializations) and SpecializationUtil.hasSpecialization(Trailer, workTool.specializations) then
 			hasWorkTool = true;
 			vehicle.cp.workTools[#vehicle.cp.workTools + 1] = workTool;
 		end;
@@ -907,7 +907,7 @@ function courseplay:load_tippers(vehicle, allowedToDrive)
 				courseplay:debug(('%s: SiloTrigger: selectedFillType = %s, isLoading = %s'):format(nameNum(vehicle), tostring(g_fillTypeManager.indexToName[siloTrigger.selectedFillType]), tostring(siloTrigger.isLoading)), 2);
 			elseif siloTrigger.isLoading then
 				courseplay:setCustomTimer(vehicle, 'siloEmptyMessageDelay', 1);
-			elseif siloIsEmpty and vehicle.cp.totalFillLevelPercent < vehicle.cp.refillUntilPct and courseplay:timerIsThrough(vehicle, 'siloEmptyMessageDelay') then
+			elseif siloIsEmpty and vehicle.cp.totalFillLevelPercent < vehicle.cp.settings.refillUntilPct:get() and courseplay:timerIsThrough(vehicle, 'siloEmptyMessageDelay') then
 				CpManager:setGlobalInfoText(vehicle, 'FARM_SILO_IS_EMPTY');
 			end;
 		else
@@ -918,7 +918,7 @@ function courseplay:load_tippers(vehicle, allowedToDrive)
 	-- drive on when required fill level is reached
 	-- in case of waiting to be loaded e.g. by shovel 
 	if not driveOn and (courseplay:timerIsThrough(vehicle, 'fillLevelChange') or vehicle.cp.prevFillLevelPct == nil) then
-		if vehicle.cp.prevFillLevelPct ~= nil and vehicle.cp.totalFillLevelPercent == vehicle.cp.prevFillLevelPct and vehicle.cp.totalFillLevelPercent > vehicle.cp.refillUntilPct then
+		if vehicle.cp.prevFillLevelPct ~= nil and vehicle.cp.totalFillLevelPercent == vehicle.cp.prevFillLevelPct and vehicle.cp.totalFillLevelPercent > vehicle.cp.settings.refillUntilPct:get() then
 			driveOn = true;
 		end;
 		vehicle.cp.prevFillLevelPct = vehicle.cp.totalFillLevelPercent;
@@ -926,7 +926,7 @@ function courseplay:load_tippers(vehicle, allowedToDrive)
 	end;
 	
 	--if established on a fill trigger go on immediately when level is reached
-	if currentTrailer.cp.currentSiloTrigger ~= nil and (vehicle.cp.totalFillLevelPercent > vehicle.cp.refillUntilPct or vehicle.cp.settings.driveUnloadNow:is(true)) then
+	if currentTrailer.cp.currentSiloTrigger ~= nil and (vehicle.cp.totalFillLevelPercent > vehicle.cp.settings.refillUntilPct:get() or vehicle.cp.settings.driveUnloadNow:is(true)) then
 		courseplay:setFillOnTrigger(vehicle,currentTrailer,false,currentTrailer.cp.currentSiloTrigger)
 		driveOn = true;
 	end;	
@@ -1428,7 +1428,7 @@ function courseplay:fillOnTrigger(vehicle, objectToFill,triggerId)
 				local triggerFilltype = trigger:getCurrentFillType()
 				local fillUnits = objectToFill:getFillUnits()
 				for i=1,#fillUnits do
-					if objectToFill:getFillUnitFillLevelPercentage(i)*100 < vehicle.cp.refillUntilPct and courseplay:fillTypesMatch(vehicle, fillTrigger, objectToFill,i) then
+					if objectToFill:getFillUnitFillLevelPercentage(i)*100 < vehicle.cp.settings.refillUntilPct:get() and courseplay:fillTypesMatch(vehicle, fillTrigger, objectToFill,i) then
 						courseplay.debugVehicle(19,vehicle,'start filling')
 						courseplay:setFillOnTrigger(vehicle,objectToFill,true,trigger,triggerIndex)
 						allowedToDrive = false;

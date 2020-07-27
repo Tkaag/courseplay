@@ -1494,9 +1494,6 @@ function courseplay:addNewTargetVector(vehicle, x, z, trailer,node,rev)
 	table.insert(vehicle.cp.nextTargets, { x = tx, y = ty, z = tz,rev = pointReverse });
 end;
 
-function courseplay:changeRefillUntilPct(vehicle, changeBy)
-	vehicle.cp.refillUntilPct = MathUtil.clamp(vehicle.cp.refillUntilPct + changeBy, 1, 100);
-end;
 
 function courseplay:changeLastValidTipDistance(vehicle, changeBy)
 	vehicle.cp.lastValidTipDistance = MathUtil.clamp(vehicle.cp.lastValidTipDistance + changeBy, -500, 0);
@@ -3154,7 +3151,6 @@ function TurnStageSetting:init(vehicle)
 	self:set(false)
 end
 
---not used right now!
 ---@class RefillUntilPctSetting : PercentageSettingList
 RefillUntilPctSetting = CpObject(PercentageSettingList)
 function RefillUntilPctSetting:init(vehicle)

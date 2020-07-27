@@ -1191,9 +1191,9 @@ function courseplay.hud:updatePageContent(vehicle, page)
 					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_OPPOSITE_TURN_DIRECTION');
 					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.oppositeTurnMode and courseplay:loc('COURSEPLAY_OPPOSITE_TURN_WHEN_POSSIBLE') or courseplay:loc('COURSEPLAY_OPPOSITE_TURN_AT_END');
 														
-				elseif entry.functionToCall == 'changeRefillUntilPct' then
-					vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_REFILL_UNTIL_PCT');
-					vehicle.cp.hud.content.pages[page][line][2].text = ('%d%%'):format(vehicle.cp.refillUntilPct);
+				elseif entry.functionToCall == 'refillUntilPct:changeByX' then
+					vehicle.cp.hud.content.pages[page][line][1].text = vehicle.cp.settings.refillUntilPct:getLabel() 
+					vehicle.cp.hud.content.pages[page][line][2].text = vehicle.cp.settings.refillUntilPct:getText()
 							
 				elseif entry.functionToCall == 'automaticUnloadingOnField:toggle' then
 					--not used right now!
@@ -2350,7 +2350,7 @@ function courseplay.hud:setGrainTransportAIDriverContent(vehicle)
 
 	--page 3 
 	self:enablePageButton(vehicle, 3)
-	self:addSettingsRowWithArrows(vehicle,nil,'changeRefillUntilPct', 3, 1, 1 )
+	self:addSettingsRowWithArrows(vehicle,vehicle.cp.settings.refillUntilPct,'changeByX', 3, 1, 1 )
 	self:addRowButton(vehicle,vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver,'addFilltype', 3, 2, 1 )
 	self:setupSiloSelectedFillTypeList(vehicle,vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver, 3, 3, 7, 1,true)
 	--page 7 
@@ -2406,7 +2406,7 @@ function courseplay.hud:setUnloadableFieldworkAIDriverContent(vehicle)
 	
 	self:addRowButton(vehicle,nil,'forceGoToUnloadCourse', 1, 2, 3 )
 
-	self:addSettingsRow(vehicle,nil,'changeRefillUntilPct', 3, 5, 1 )
+	self:addSettingsRow(vehicle,vehicle.cp.settings.refillUntilPct,'changeByX', 3, 5, 1 )
 	
 	self:setReloadPageOrder(vehicle, -1, true)
 end

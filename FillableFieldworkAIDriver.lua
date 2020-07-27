@@ -127,13 +127,13 @@ function FillableFieldworkAIDriver:fillAtWaitPoint()
 			end
 		end
 		if self.prevTotalFillAmount ~= newTotal then
-			courseplay:setCustomTimer(vehicle, "fillLevelChange", 7)
+			courseplay:setCustomTimer(self.vehicle, "fillLevelChange", 7)
 			self.prevTotalFillAmount = newTotal
 		else
-			if courseplay:timerIsThrough(vehicle, "fillLevelChange",false) then
+			if courseplay:timerIsThrough(self.vehicle, "fillLevelChange",false) then
 				if self:areFillLevelsOk() then
 					self:continue()
-					courseplay:resetCustomTimer(vehicle, "fillLevelChange",true);
+					courseplay:resetCustomTimer(self.vehicle, "fillLevelChange",true);
 					self.prevFillLevelPct = nil
 				end
 			end
