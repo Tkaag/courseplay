@@ -37,6 +37,8 @@ function courseplay:setAIDriver(vehicle, mode)
 	elseif mode == courseplay.MODE_COMBI then
 		status,driver,err = xpcall(CombineUnloadAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = CombineUnloadAIDriver(vehicle)
+	elseif mode == courseplay.MODE_OVERLOADER then
+		vehicle.cp.driver = OverloaderAIDriver(vehicle)
 	elseif mode == courseplay.MODE_SHOVEL_FILL_AND_EMPTY then
 		status,driver,err = xpcall(ShovelModeAIDriver, function(err) printCallstack(); return self,err end, vehicle)
 		vehicle.cp.driver = ShovelModeAIDriver(vehicle)
@@ -2342,8 +2344,10 @@ function StartingPointSetting:init(vehicle)
 end
 
 function StartingPointSetting:checkAndSetValidValue(new)
-	-- enable unload only for CombineUnloadAIDriver
-	if self.vehicle.cp.driver and self.vehicle.cp.mode ~= courseplay.MODE_COMBI and
+	-- enable unload only for CombineUnloadAIDriver/Overloader
+	if self.vehicle.cp.driver and
+			self.vehicle.cp.mode ~= courseplay.MODE_COMBI and
+			self.vehicle.cp.mode ~= courseplay.MODE_OVERLOADER and
 			self.values[new] == StartingPointSetting.START_WITH_UNLOAD then
 		return 1
 	else
