@@ -220,28 +220,10 @@ function courseplay.button:handleHoverAction(vehicle, posX, posY)
 		local downParameter = upParameter * -1;
 		if Input.isMouseButtonPressed(Input.MOUSE_BUTTON_WHEEL_UP) and button.canScrollUp then
 			courseplay:debug(string.format("%s: MOUSE_BUTTON_WHEEL_UP: %s(%s)", nameNum(vehicle), tostring(button.functionToCall), tostring(upParameter)), 18);
-			if self.settingCall then --settingButton
-				self.settingCall[self.functionToCall](self.settingCall, upParameter)
-				if vehicle:getIsEntered() then
-					g_currentMission.hud.guiSoundPlayer:playSample(GuiSoundPlayer.SOUND_SAMPLES.CLICK)
-				end
-			--	courseplay:debug(('%s: calling function "%s(%s)"'):format(nameNum(self), tostring(func), tostring(value)), 18);
-				courseplay.hud:setReloadPageOrder(vehicle, vehicle.cp.hud.currentPage, true);
-			else
-				vehicle:setCourseplayFunc(button.functionToCall, upParameter, false, button.page);
-			end
+			self:handleInput(vehicle,upParameter)
 		elseif Input.isMouseButtonPressed(Input.MOUSE_BUTTON_WHEEL_DOWN) and button.canScrollDown then
 			courseplay:debug(string.format("%s: MOUSE_BUTTON_WHEEL_DOWN: %s(%s)", nameNum(vehicle), tostring(button.functionToCall), tostring(downParameter)), 18);
-			if self.settingCall then --settingButton
-				self.settingCall[self.functionToCall](self.settingCall, downParameter)	
-				if vehicle:getIsEntered() then
-					g_currentMission.hud.guiSoundPlayer:playSample(GuiSoundPlayer.SOUND_SAMPLES.CLICK)
-				end
-			--	courseplay:debug(('%s: calling function "%s(%s)"'):format(nameNum(self), tostring(func), tostring(value)), 18);
-				courseplay.hud:setReloadPageOrder(vehicle, vehicle.cp.hud.currentPage, true);
-			else
-				vehicle:setCourseplayFunc(button.functionToCall, downParameter, false, button.page);
-			end
+			self:handleInput(vehicle,downParameter)
 		end;
 	end;
 end
@@ -266,20 +248,24 @@ function courseplay.button:handleMouseClick(vehicle)
 		if self.functionToCall == "goToVehicle" then
 			courseplay:executeFunction(vehicle, "goToVehicle", parameter)
 		else
-			if self.settingCall then --settingButton
-				self.settingCall[self.functionToCall](self.settingCall, parameter)
-				if vehicle:getIsEntered() then
-					g_currentMission.hud.guiSoundPlayer:playSample(GuiSoundPlayer.SOUND_SAMPLES.CLICK)
-				end
-			--	courseplay:debug(('%s: calling function "%s(%s)"'):format(nameNum(self), tostring(func), tostring(value)), 18);
-				courseplay.hud:setReloadPageOrder(vehicle, vehicle.cp.hud.currentPage, true);
-			else
-				vehicle:setCourseplayFunc(self.functionToCall, parameter, self.onlyCallLocal, self.page);
-			end
+			courseplay:debug(string.format("%s: MOUSE_BUTTON_ClICKED: %s(%s)", nameNum(vehicle), tostring(self.functionToCall), tostring(parameter)), 18);
+			self:handleInput(vehicle,parameter)
 		end
 		-- self:setClicked(false);
 	end;
 end;
+
+function courseplay.button:handleInput(vehicle,parameter)
+	if self.settingCall then --settingButton
+		self.settingCall[self.functionToCall](self.settingCall, parameter)	
+		if vehicle:getIsEntered() then
+			g_currentMission.hud.guiSoundPlayer:playSample(GuiSoundPlayer.SOUND_SAMPLES.CLICK)
+		end
+		courseplay.hud:setReloadPageOrder(vehicle, vehicle.cp.hud.currentPage, true);
+	else
+		vehicle:setCourseplayFunc(self.functionToCall, parameter, self.onlyCallLocal or false, self.page);
+	end
+end
 
 function courseplay.button:setOffset(offsetX, offsetY)
 	offsetX = offsetX or 0

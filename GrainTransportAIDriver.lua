@@ -62,25 +62,24 @@ function GrainTransportAIDriver:drive(dt)
 	local giveUpControl = false
 	-- should we keep driving?
 	local allowedToDrive = self:checkLastWaypoint()
-
-	-- TODO: are these checks really necessary?
-	if self.vehicle.cp.totalFillLevel ~= nil
-		and self.vehicle.cp.tipRefOffset ~= nil
-		and self.vehicle.cp.workToolAttached then
-
-		self:searchForTipTriggers()
-
-		allowedToDrive = self:load(allowedToDrive)
-		allowedToDrive, giveUpControl = self:onUnLoadCourse(allowedToDrive, dt)
-	else
-		self:debug('Safety check failed')
-	end
 	
-	if self.vehicle.settings.siloSelectedFillTypeGrainTransportDriver:isEmpty() then 
+	if self.vehicle.cp.settings.siloSelectedFillTypeGrainTransportDriver:isEmpty() then 
 		allowedToDrive = false
 		self:setInfoText('NO_SELECTED_FILLTYPE')
 	else
 		self:clearInfoText('NO_SELECTED_FILLTYPE')
+			-- TODO: are these checks really necessary?
+		if self.vehicle.cp.totalFillLevel ~= nil
+			and self.vehicle.cp.tipRefOffset ~= nil
+			and self.vehicle.cp.workToolAttached then
+
+			self:searchForTipTriggers()
+
+			allowedToDrive = self:load(allowedToDrive)
+			allowedToDrive, giveUpControl = self:onUnLoadCourse(allowedToDrive, dt)
+		else
+			self:debug('Safety check failed')
+		end
 	end
 	
 	-- TODO: clean up the self.allowedToDrives above and use a local copy

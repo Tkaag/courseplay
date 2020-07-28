@@ -41,6 +41,7 @@ function FillableFieldworkAIDriver:init(vehicle)
 end
 function FillableFieldworkAIDriver:start(startingPoint)
 	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
+	self:findPipe()
 	FieldworkAIDriver.start(self,startingPoint)
 end
 function FillableFieldworkAIDriver:setHudContent()
@@ -86,9 +87,15 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 		if distanceToWait < 1 then
 			self:fillAtWaitPoint()
 		end	
+		if self:is_a(FieldSupplyAIDriver) and self.pipe then
+			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_OPEN)
+		end
 	else
 		-- just drive normally
 		self:setSpeed(self:getRecordedSpeed())
+		if self.waitPointIx and self.waitPointIx+3 <self.ppc:getCurrentWaypointIx() then
+			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_CLOSE)
+		end
 	end
 	if self.loadingState == self.states.IS_LOADING  then
 		self:checkFilledUnitFillPercantage()
@@ -108,39 +115,20 @@ function FillableFieldworkAIDriver:fillAtWaitPoint()
 		return
 	end
 	self:setLoadingState()
-	if self.prevTotalFillAmount == nil then
-		self.prevTotalFillAmount = 0
-		for fillType, info in pairs(fillLevelInfo) do
-			for _,data in ipairs(fillTypeData) do
-				if data.fillType == fillType then
-					self.prevTotalFillAmount = self.prevTotalFillAmount+info.capacity
-				end
+	
+	local newTotalFillLevel = 0
+	for fillType, info in pairs(fillLevelInfo) do
+		for _,data in ipairs(fillTypeData) do
+			if data.fillType == fillType then
+				newTotalFillLevel = newTotalFillLevel+info.fillLevel
 			end
-		end
-	else
-		local newTotal = 0
-		for fillType, info in pairs(fillLevelInfo) do
-			for _,data in ipairs(fillTypeData) do
-				if data.fillType == fillType then
-					newTotal = newTotal+info.capacity
-				end
-			end
-		end
-		if self.prevTotalFillAmount ~= newTotal then
-			courseplay:setCustomTimer(self.vehicle, "fillLevelChange", 7)
-			self.prevTotalFillAmount = newTotal
-		else
-			if courseplay:timerIsThrough(self.vehicle, "fillLevelChange",false) then
-				if self:areFillLevelsOk() then
-					self:continue()
-					courseplay:resetCustomTimer(self.vehicle, "fillLevelChange",true);
-					self.prevFillLevelPct = nil
-				end
-			end
-			
 		end
 	end
-	self:setInfoText('WAIT_POINT')
+	if self:levelDidNotChange(newTotalFillLevel) and self:areFillLevelsOk(fillLevelInfo) then 
+		self:continue()
+		
+	end
+	self:setInfoText('REACHED_REFILLING_POINT')
 end
 
 function FillableFieldworkAIDriver:continue()
@@ -159,10 +147,11 @@ end
 function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 	local allOk = true
 	local hasSeeds, hasNoFertilizer = false, false
-	local fillTypeData, fillTypeDataSize= self:getSiloSelectedFillTypeData()
-	if fillTypeData == nil then
-		return
+	if self:getSiloSelectedFillTypeSetting():isEmpty() and AIDriverUtil.hasAIImplementWithSpecialization(self.vehicle, Cultivator) then
+		courseplay:setInfoText(self.vehicle, "skipping loading Seeds/Fertilizer and continue with Cultivator !!!")
+		return true
 	end
+	
 	for fillType, info in pairs(fillLevelInfo) do
 		if self:isValidFillType(fillType) and info.fillLevel == 0 and info.capacity > 0 and not self:helperBuysThisFillType(fillType) then
 			allOk = false
@@ -170,19 +159,6 @@ function FillableFieldworkAIDriver:areFillLevelsOk(fillLevelInfo)
 		else
 			if fillType == FillType.SEEDS then hasSeeds = true end
 		end		
-		--skip all the fillTypes not assigned 
-		--TODO: needs tweaking!!
-		if fillTypeData then 
-			local foundFillType 
-			for _,data in pairs(fillTypeData) do 
-				if data.fillType == fillType then
-					foundFillType=true
-				end
-			end
-			if not foundFillType then 
-				allOk=true
-			end
-		end
 	end
 	-- special handling for sowing machines with fertilizer
 	if not allOk and self.vehicle.cp.settings.sowingMachineFertilizerEnabled:is(false) and hasNoFertilizer and hasSeeds then
@@ -314,6 +290,22 @@ function FillableFieldworkAIDriver:checkFilledUnitFillPercantage()
 	end
 end
 
+--TODO might change this one 
+function FillableFieldworkAIDriver:levelDidNotChange(fillLevelPercent)
+	--fillLevel changed in last loop-> start timer
+	if self.prevFillLevelPct == nil or self.prevFillLevelPct ~= fillLevelPercent then
+		self.prevFillLevelPct = fillLevelPercent
+		courseplay:setCustomTimer(self.vehicle, "fillLevelChange", 3)
+	end
+	--if time is up and no fillLevel change happend, return true
+	if courseplay:timerIsThrough(self.vehicle, "fillLevelChange",false) then
+		if self.prevFillLevelPct == fillLevelPercent then
+			return true
+		end
+		courseplay:resetCustomTimer(self.vehicle, "fillLevelChange",nil)
+	end
+end
+
 function FillableFieldworkAIDriver:getSiloSelectedFillTypeSetting()
 	if self.vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
 		siloSelectedFillTypeSetting = self.vehicle.cp.settings.siloSelectedFillTypeFillableFieldWorkDriver
@@ -326,10 +318,16 @@ end
 
 function FillableFieldworkAIDriver:getSiloSelectedFillTypeData()
 	local siloSelectedFillTypeSetting = self:getSiloSelectedFillTypeSetting()
-	
 	if siloSelectedFillTypeSetting then
 		local fillTypeData = siloSelectedFillTypeSetting:getData()
 		local size = siloSelectedFillTypeSetting:getSize()
 		return fillTypeData,size
 	end
+end
+
+function FillableFieldworkAIDriver:findPipe()
+    local implementWithPipe = AIDriverUtil.getImplementWithSpecialization(self.vehicle, Pipe)
+    if implementWithPipe then
+        self.pipe = implementWithPipe.spec_pipe
+    end
 end

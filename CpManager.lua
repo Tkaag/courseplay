@@ -930,7 +930,8 @@ function CpManager:setupGlobalInfoText()
 		WORK_END					= { level =  1, text = 'COURSEPLAY_WORK_END' };
 		REACHED_OVERLOADING_POINT	= { level =  0, text = 'COURSEPLAY_REACHED_OVERLOADING_POINT' };
 		NO_SELECTED_FILLTYPE		= { level =  0, text = 'COURSEPLAY_NO_SELECTED_FILLTYPE' };
-
+		REACHED_REFILLING_POINT		= { level =  0, text = 'COURSEPLAY_REACHED_REFILL_POINT' };
+		WRONG_FILLTYPE_FOR_TRIGGER	= { level =  0, text = 'COURSEPLAY_WRONG_FILLTYPE_FOR_TRIGGER' };
 	};
 end;
 

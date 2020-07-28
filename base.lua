@@ -552,7 +552,7 @@ function courseplay:onLoad(savegame)
 	self.cp.settings:addSetting(SowingMachineFertilizerEnabled, self)
 	self.cp.settings:addSetting(EnableOpenHudWithMouseVehicle, self)
 	self.cp.settings:addSetting(EnableVisualWaypointsTemporary, self)
-	
+
 	self.cp.settings:addSetting(StopAtEndSetting, self)
 	self.cp.settings:addSetting(AutomaticCoverHandlingSetting, self)
 	self.cp.settings:addSetting(AutomaticUnloadingOnFieldSetting, self)
@@ -571,7 +571,7 @@ function courseplay:onLoad(savegame)
 	self.cp.settings:addSetting(FillableFieldWorkDriver_SiloSelectedFillTypeSetting, self)
 	self.cp.settings:addSetting(FieldSupplyDriver_SiloSelectedFillTypeSetting, self)
 	self.cp.settings:addSetting(DriveOnAtFillLevelSetting, self)
-	
+	self.cp.settings:addSetting(RefillUntilPctSetting, self)
 	---@type SettingsContainer
 	self.cp.courseGeneratorSettings = SettingsContainer("courseGeneratorSettings")
 	self.cp.courseGeneratorSettings:addSetting(CenterModeSetting, self)

@@ -702,12 +702,13 @@ function courseplay.hud:updatePageContent(vehicle, page)
 					end
 				
 				elseif entry.functionToCall == 'cancelWait' then
-					if vehicle:getIsCourseplayDriving() and vehicle.cp.driver:isWaiting() or vehicle.cp.driver:isLoading() and vehicle.cp.driver:is_a(FillableFieldworkAIDriver) then
-						self:enableButtonWithFunction(vehicle,page, 'cancelWait')
-						vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_CONTINUE')
-					else
-						self:disableButtonWithFunction(vehicle,page, 'cancelWait')
-					end				
+						if vehicle.cp.driver and (vehicle:getIsCourseplayDriving() and vehicle.cp.driver.isWaiting and vehicle.cp.driver:isWaiting() or vehicle.cp.driver:isLoading() and vehicle.cp.driver:is_a(FillableFieldworkAIDriver)) then
+							self:enableButtonWithFunction(vehicle,page, 'cancelWait')
+							vehicle.cp.hud.content.pages[page][line][1].text = courseplay:loc('COURSEPLAY_CONTINUE')
+						else
+							self:disableButtonWithFunction(vehicle,page, 'cancelWait')
+						end				
+					
 				elseif entry.functionToCall == 'startingPoint:next' then
 					--StartingPointSetting
 					if not vehicle:getIsCourseplayDriving() and vehicle.cp.canDrive then

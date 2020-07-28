@@ -128,22 +128,6 @@ function FieldSupplyAIDriver:isFillLevelToContinueReached()
 	end
 end
 
---TODO might change this one 
-function FieldSupplyAIDriver:levelDidNotChange(fillLevelPercent)
-	--fillLevel changed in last loop-> start timer
-	if self.prevFillLevelPct == nil or self.prevFillLevelPct ~= fillLevelPercent then
-		self.prevFillLevelPct = fillLevelPercent
-		courseplay:setCustomTimer(self.vehicle, "fillLevelChange", 3);
-	end
-	--if time is up and no fillLevel change happend, return true
-	if courseplay:timerIsThrough(self.vehicle, "fillLevelChange",false) then
-		if self.prevFillLevelPct == fillLevelPercent then
-			return true
-		end
-		courseplay:resetCustomTimer(self.vehicle, "fillLevelChange",true);
-	end
-end
-
 --TODO: figure out the usage of this one ??
 function FieldSupplyAIDriver:stopAndWait(dt)
 	AIVehicleUtil.driveInDirection(self.vehicle, dt, self.vehicle.cp.steeringAngle, 1, 0.5, 10, false, fwd, 0, 1, 0, 1)

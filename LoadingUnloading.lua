@@ -53,28 +53,37 @@ function courseplay:isUnloadingTriggerAvailable(object)
 	if rootVehicle and spec then 
 		if spec:getCanToggleDischargeToObject() then 
 			local currentDischargeNode = spec.currentDischargeNode
-			if currentDischargeNode.dischargeObject then 
-				rootVehicle.cp.driver:countTriggerUp(object)
-				rootVehicle.cp.driver:setInTriggerRange()
-			else
-				rootVehicle.cp.driver:countTriggerDown(object)
-			end
-			if currentDischargeNode and spec.currentDischargeState == Dischargeable.DISCHARGE_STATE_OFF then
-				if not spec:getCanDischargeToObject(currentDischargeNode) then
-					for i=1,#spec.dischargeNodes do
-						if spec:getCanDischargeToObject(spec.dischargeNodes[i])then
-							spec:setCurrentDischargeNodeIndex(spec.dischargeNodes[i]);
-							currentDischargeNode = spec:getCurrentDischargeNode()
-							break
+			if currentDischargeNode then
+				if currentDischargeNode.dischargeObject then 
+					rootVehicle.cp.driver:countTriggerUp(object)
+					rootVehicle.cp.driver:setInTriggerRange()
+					courseplay:setInfoText(rootVehicle,"COURSEPLAY_TIPTRIGGER_REACHED")
+				else
+					rootVehicle.cp.driver:countTriggerDown(object)
+				end
+				if currentDischargeNode.dischargeFailedReason == Dischargeable.DISCHARGE_REASON_NO_FREE_CAPACITY then 
+					CpManager:setGlobalInfoText(rootVehicle, 'FARM_SILO_IS_FULL');
+					rootVehicle.cp.driver:setUnloadingState()
+				elseif currentDischargeNode.dischargeFailedReason == Dischargeable.DISCHARGE_REASON_FILLTYPE_NOT_SUPPORTED then
+				--	CpManager:setGlobalInfoText(rootVehicle, 'WRONG_FILLTYPE_FOR_TRIGGER');
+				end
+				if spec.currentDischargeState == Dischargeable.DISCHARGE_STATE_OFF then
+					if not spec:getCanDischargeToObject(currentDischargeNode) then
+						for i=1,#spec.dischargeNodes do
+							if spec:getCanDischargeToObject(spec.dischargeNodes[i])then
+								spec:setCurrentDischargeNodeIndex(spec.dischargeNodes[i]);
+								currentDischargeNode = spec:getCurrentDischargeNode()
+								break
+							end
 						end
 					end
-				end
-				if spec:getCanDischargeToObject(currentDischargeNode) and not rootVehicle.cp.driver:isNearFillPoint() then
-					if not object:getFillUnitFillType(currentDischargeNode.fillUnitIndex) or rootVehicle.cp.driver:ignoreTrigger() then 
-						return
+					if spec:getCanDischargeToObject(currentDischargeNode) and not rootVehicle.cp.driver:isNearFillPoint() then
+						if not object:getFillUnitFillType(currentDischargeNode.fillUnitIndex) or rootVehicle.cp.driver:ignoreTrigger() then 
+							return
+						end
+						spec:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT)				
+						rootVehicle.cp.driver:setUnloadingState(object)
 					end
-					spec:setDischargeState(Dischargeable.DISCHARGE_STATE_OBJECT)				
-					rootVehicle.cp.driver:setUnloadingState(object)
 				end
 			end
 		else
@@ -376,33 +385,21 @@ function courseplay:unloadingTriggerCallback(superFunc,triggerId, otherId, onEnt
 		end
 		local object = g_currentMission:getNodeObject(otherId)
         if object ~= nil and object ~= self and object:isa(Vehicle) then
-            if onEnter and object.getFillUnitIndexFromNode ~= nil then
+            if object.getFillUnitIndexFromNode ~= nil then
                 local fillUnitIndex = object:getFillUnitIndexFromNode(otherId)
                 if fillUnitIndex ~= nil then
-                    local spec = self.spec_pipe
                     local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
                     if dischargeNode ~= nil then
-                        local fillTypes = self:getFillUnitSupportedFillTypes(dischargeNode.fillUnitIndex)
-                        -- objects is only valid if it supports at least one of the harvesters fill types
-                        local objectSupportsFillType = false
-                        for fillType, _ in pairs(fillTypes) do
-                            if object:getFillUnitSupportsFillType(fillUnitIndex, fillType) then
-                                objectSupportsFillType = true
-                                break
-                            end
-                        end
-                        if objectSupportsFillType then
-							local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())
-							if dischargeNode ~= nil then
-								local outputFillType = self:getFillUnitLastValidFillType(dischargeNode.fillUnitIndex)
-								SpecializationUtil.raiseEvent(object, "onAddedFillUnitTrigger",outputFillType,fillUnitIndex,1)
-							--	rootVehicle.cp.driver:setUnloadingState()
-							end
+                        local fillType = self:getFillUnitFillType(dischargeNode.fillUnitIndex)
+                        if fillType then 
+							courseplay.debugFormat(2,"unloadingTriggerCallback open Cover")
+							SpecializationUtil.raiseEvent(object, "onAddedFillUnitTrigger",fillType,fillUnitIndex,1)
 						end
 					end
 				end
 			elseif onLeave then
 				SpecializationUtil.raiseEvent(object, "onRemovedFillUnitTrigger",0)
+				courseplay.debugFormat(2,"unloadingTriggerCallback close Cover")
 			end
 		end
 		if onLeave then
