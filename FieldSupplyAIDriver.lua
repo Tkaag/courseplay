@@ -41,17 +41,13 @@ end
 function FieldSupplyAIDriver:setHudContent()
 	courseplay.hud:setFieldSupplyAIDriverContent(self.vehicle)
 end
-
+--this one is should be better derived!!
 function FieldSupplyAIDriver:start(startingPoint)
-	self:beforeStart()
-	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
-	self.course = Course(self.vehicle, self.vehicle.Waypoints)
-	self.ppc:setCourse(self.course)
-	local ix = self.course:getStartingWaypointIx(AIDriverUtil.getDirectionNode(self.vehicle), startingPoint)
-	self.ppc:initialize(ix)
-	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
 	self.refillState = self.states.REFILL_DONE
-	AIDriver.continue(self)
+	AIDriver.start(self,startingPoint)
+	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
+	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
+	self:findPipe() --for Augerwagons
 end
 
 function FieldSupplyAIDriver:stop(msgReference)
@@ -60,20 +56,23 @@ function FieldSupplyAIDriver:stop(msgReference)
 	AIDriver.stop(self, msgReference)
 end
 
+function FieldSupplyAIDriver:onEndCourse()
+	AIDriver.onEndCourse(self)
+end
 
 function FieldSupplyAIDriver:drive(dt)
 	-- update current waypoint/goal point
 	if self.supplyState == self.states.ON_REFILL_COURSE  then
-		self:clearInfoText('REACHED_OVERLOADING_POINT')
 		FillableFieldworkAIDriver.driveUnloadOrRefill(self)
 		AIDriver.drive(self, dt)
 	elseif self.supplyState == self.states.WAITING_FOR_GETTING_UNLOADED then
 		self:stopAndWait(dt)
-		self:setInfoText('REACHED_OVERLOADING_POINT')
 		self:updateInfoText()
+		if self.pipe then
+			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_OPEN)
+		end
 		-- unload into a FRC if there is one
 		courseplay:isUnloadingTriggerAvailable(self.vehicle)
-	--	AIDriver.tipIntoStandardTipTrigger(self)
 		--if i'm empty or fillLevel is below threshold then drive to get new stuff
 		if self:isFillLevelToContinueReached() then
 			self:continue()
@@ -84,12 +83,10 @@ end
 
 function FieldSupplyAIDriver:continue()
 	self:changeSupplyState(self.states.ON_REFILL_COURSE )
-	self.state = self.states.RUNNING
 	if self:isUnloading() then
 		self.activeTriggers=nil
 	end
-	self.loadingState = self.states.DRIVE_NOW
-	self:forceStopLoading()
+	AIDriver.continue(self)
 end
 
 function FieldSupplyAIDriver:onWaypointPassed(ix)
@@ -102,6 +99,8 @@ function FieldSupplyAIDriver:onWaypointPassed(ix)
 		-- show continue button
 		self.state = self.states.STOPPED
 		self:changeSupplyState(self.states.WAITING_FOR_GETTING_UNLOADED)
+		self:setInfoText('REACHED_OVERLOADING_POINT')
+		self:refreshHUD()
 	end
 end
 

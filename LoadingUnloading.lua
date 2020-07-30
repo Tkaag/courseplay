@@ -230,12 +230,10 @@ function courseplay:onActivateObject(superFunc,vehicle,callback)
 								if not vehicle.cp.driver:isFilledUntilPercantageX(fillTypeIndex,data.maxFillLevel) then 
 									if fillableObject.spec_cover and fillableObject.spec_cover.isDirty then 
 										vehicle.cp.driver:setLoadingState(fillableObject,fillUnitIndex,fillTypeIndex,self)
-										callback.waitingForCover = true
 										courseplay.debugFormat(2, 'Cover is still opening!')
 										return
 									end
 									if fillableObject:getFillUnitCapacity(fillUnitIndex) <=0 then
-										callback.full=true
 										vehicle.cp.driver:resetLoadingState()
 										return
 									else
@@ -385,7 +383,7 @@ function courseplay:unloadingTriggerCallback(superFunc,triggerId, otherId, onEnt
 		end
 		local object = g_currentMission:getNodeObject(otherId)
         if object ~= nil and object ~= self and object:isa(Vehicle) then
-            if object.getFillUnitIndexFromNode ~= nil then
+            if object.getFillUnitIndexFromNode ~= nil and not onLeave then
                 local fillUnitIndex = object:getFillUnitIndexFromNode(otherId)
                 if fillUnitIndex ~= nil then
                     local dischargeNode = self:getDischargeNodeByIndex(self:getPipeDischargeNodeIndex())

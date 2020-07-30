@@ -41,7 +41,6 @@ function FillableFieldworkAIDriver:init(vehicle)
 end
 function FillableFieldworkAIDriver:start(startingPoint)
 	self:getSiloSelectedFillTypeSetting():cleanUpOldFillTypes()
-	self:findPipe()
 	FieldworkAIDriver.start(self,startingPoint)
 end
 function FillableFieldworkAIDriver:setHudContent()
@@ -51,6 +50,7 @@ end
 
 function FillableFieldworkAIDriver:changeToUnloadOrRefill()
 	self.refillState = self.states.TO_BE_REFILLED
+	self:refreshHUD()
 	FieldworkAIDriver.changeToUnloadOrRefill(self)
 end
 --- Out of seeds/fertilizer/whatever
@@ -71,8 +71,9 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 	end
 	local isNearWaitPoint, waitPointIx = self.course:hasWaitPointWithinDistance(self.ppc:getCurrentWaypointIx(), 5)
 	self.waitPointIx = waitPointIx
+	local isInWaitPointRange = self.waitPointIx and self.waitPointIx+5 >self.ppc:getCurrentWaypointIx() or isNearWaitPoint 
 	if self:is_a(FieldSupplyAIDriver) then
-		if not isNearWaitPoint or not (self.waitPointIx and self.waitPointIx+5 >self.ppc:getCurrentWaypointIx())  then
+		if not isInWaitPointRange  then
 			courseplay:isTriggerAvailable(self.vehicle)
 		end
 	else
@@ -87,14 +88,11 @@ function FillableFieldworkAIDriver:driveUnloadOrRefill()
 		if distanceToWait < 1 then
 			self:fillAtWaitPoint()
 		end	
-		if self:is_a(FieldSupplyAIDriver) and self.pipe then
-			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_OPEN)
-		end
 	else
 		-- just drive normally
 		self:setSpeed(self:getRecordedSpeed())
-		if self.waitPointIx and self.waitPointIx+3 <self.ppc:getCurrentWaypointIx() then
-			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_CLOSE)
+		if self:is_a(FieldSupplyAIDriver) and self.pipe and not isInWaitPointRange then
+			self.pipe:setPipeState(AIDriverUtil.PIPE_STATE_CLOSED)
 		end
 	end
 	if self.loadingState == self.states.IS_LOADING  then
@@ -126,20 +124,15 @@ function FillableFieldworkAIDriver:fillAtWaitPoint()
 	end
 	if self:levelDidNotChange(newTotalFillLevel) and self:areFillLevelsOk(fillLevelInfo) then 
 		self:continue()
-		
 	end
 	self:setInfoText('REACHED_REFILLING_POINT')
+	
 end
 
 function FillableFieldworkAIDriver:continue()
-	self:debug('Continuing...')
-	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
 	self.refillState = self.states.REFILL_DONE	
-	if self:isLoading() or self:isUnloading() then
-		self:forceStopLoading()
-		self.loadingState = self.states.DRIVE_NOW
-	end
-	self:clearAllInfoTexts()
+	AIDriver.continue(self)
+	self.state = self.states.ON_UNLOAD_OR_REFILL_COURSE
 end
 
 -- is the fill level ok to continue? With fillable tools we need to stop working when we are out
@@ -328,6 +321,6 @@ end
 function FillableFieldworkAIDriver:findPipe()
     local implementWithPipe = AIDriverUtil.getImplementWithSpecialization(self.vehicle, Pipe)
     if implementWithPipe then
-        self.pipe = implementWithPipe.spec_pipe
+        self.pipe = implementWithPipe
     end
 end
