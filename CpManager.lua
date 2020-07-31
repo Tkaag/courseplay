@@ -271,7 +271,10 @@ function CpManager:update(dt)
 		end;
 	end;
 	g_trafficController:update(dt)
-	g_combineUnloadManager:onUpdate()
+	status,driver,err = xpcall(g_combineUnloadManager.onUpdate, function(err) printCallstack(); return self,err end, g_combineUnloadManager)
+	if not status then
+		courseplay.infoVehicle(vehicle, "Exception, failed update CombineUnloadManager %s",tostring(err))
+	end
 
 	-- REAL TIME 5 SECS CHANGER
 	if self.realTime5SecsTimer < 5000 then

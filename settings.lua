@@ -1842,10 +1842,6 @@ function Setting:setParent(name)
 	self.parentName = name
 end
 
---function Setting:setEventType(name) 
---	self.EventCall = CourseplaySettingsSyncEvent.sendEvent(self.vehicle,name, self.name, self.value)
---end
-
 ---@class FloatSetting
 FloatSetting = CpObject(Setting)
 --- @param name string name of this settings, will be used as an identifier in containers and XML
@@ -2871,10 +2867,17 @@ function SiloSelectedFillTypeSetting:init(vehicle, mode)
 	self.disallowedFillTypes = nil
 	self.xmlKey = 'siloSelectedFillType'..mode
 	self.xmlAttributeSize = '#size'
---	self.xmlAttributeRunCounterActive = '#runCounterActive'
 	self.xmlAttributeRunCounter = '#runCounter'
 	self.xmlAttributeFillType = '#fillType'
 	self.xmlAttributeMaxFillLevel = '#maxFillLevel'	
+	self.NetworkTypes = {}
+	self.NetworkTypes.ADD_ELEMENT = 0
+	self.NetworkTypes.DELETE_X = 1
+	self.NetworkTypes.MOVE_UP_X = 2
+	self.NetworkTypes.MOVE_DOWN_X = 3
+	self.NetworkTypes.CHANGE_MAX_FILLLEVEL = 4
+	self.NetworkTypes.CHANGE_RUNCOUNTER = 5
+	self.NetworkTypes.CLEANUP_OLD_FILLTYPES = 6
 end
 
 function SiloSelectedFillTypeSetting:getMaxFillTypes()
@@ -2899,9 +2902,16 @@ function SiloSelectedFillTypeSetting:isFull()
 	end
 end
 
-function SiloSelectedFillTypeSetting:onFillTypeSelection(selectedFillType)
+function SiloSelectedFillTypeSetting:sendEvent(NetworkType, index , value)
+	SiloSelectedFillTypeEvent.sendEvent(self.vehicle,self.parentName,self.name, index, value)
+end
+
+function SiloSelectedFillTypeSetting:onFillTypeSelection(selectedFillType,noEventSend)
 	if selectedFillType and selectedFillType ~= FillType.UNKNOWN then 
 		self:addLast(self:fillTypeDataToAdd(selectedFillType))
+		if not noEventSend then
+			self:sendEvent(self.NetworkTypes.ADD_ELEMENT,nil,selectedFillType)
+		end
 	end
 end  
 
@@ -2924,13 +2934,13 @@ function SiloSelectedFillTypeSetting:fillTypeDataToAdd(selectedfillType)
 	return data
 end
 
-
-
---TODO: maybe automate this one ?? on disconnect
-function SiloSelectedFillTypeSetting:cleanUpOldFillTypes()
+function SiloSelectedFillTypeSetting:cleanUpOldFillTypes(noEventSend)
 	local supportedFillTypes = {}
 	self:getSupportedFillTypes(self.vehicle,supportedFillTypes)
 	self:checkSelectedFillTypes(supportedFillTypes,true)
+	if not noEventSend then
+		self:sendEvent(self.NetworkTypes.CLEANUP_OLD_FILLTYPES)
+	end
 end
 
 function SiloSelectedFillTypeSetting:checkSelectedFillTypes(supportedFillTypes,cleanUp)
@@ -3018,6 +3028,7 @@ function SiloSelectedFillTypeSetting:incrementRunCounter(index)
 	if data and data.runCounter then 
 		if not (data.runCounter >= self.MAX_RUNS) then 
 			data.runCounter = data.runCounter+1
+			self:sendEvent(self.NetworkTypes.CHANGE_RUNCOUNTER,index,1)
 		end
 	end
 end
@@ -3029,6 +3040,7 @@ function SiloSelectedFillTypeSetting:decrementRunCounterByFillType(fillTypes)
 			if data.fillType == fillType then
 				local _data = self:getDataByIndex(index)
 				_data.runCounter = _data.runCounter-1
+				self:sendEvent(self.NetworkTypes.CHANGE_RUNCOUNTER,index,-1)
 				break
 			else
 		
@@ -3042,6 +3054,7 @@ function SiloSelectedFillTypeSetting:decrementRunCounter(index)
 	if data and data.runCounter then 
 		if not (data.runCounter <= 0) then 
 			data.runCounter = data.runCounter-1
+			self:sendEvent(self.NetworkTypes.CHANGE_RUNCOUNTER,index,-1)
 		end
 	end
 end
@@ -3057,10 +3070,52 @@ function SiloSelectedFillTypeSetting:changeMaxFillLevel(index)
 	local data = self:getDataByIndex(index)
 	if data and data.maxFillLevel then 
 		local newDiff = data.maxFillLevel+diff 
-		if newDiff >0 and newDiff <101 then
+		if newDiff >0 and newDiff <=100 then
 			data.maxFillLevel = newDiff
+			self:sendEvent(self.NetworkTypes.CHANGE_MAX_FILLLEVEL,index,diff)
 		end
 	end	
+end
+
+function SiloSelectedFillTypeSetting:setRunCounterFromNetwork(index,value)
+	local totalData = self:getDataByIndex(index)
+	if data and data.runCounter then 
+		local diff = data.runCounter+value
+		if diff >= 0 and diff <=20 then 
+			data.runCounter = diff
+		end
+	end
+end
+
+function SiloSelectedFillTypeSetting:setMaxFillLevelFromNetwork(index,value)
+	local totalData = self:getDataByIndex(index)
+	if data and data.maxFillLevel then 
+		local diff = data.maxFillLevel+value
+		if diff >= 1 and diff <=100 then 
+			data.maxFillLevel = diff
+		end
+	end
+end
+
+function SiloSelectedFillTypeSetting:moveUpByIndex(index,noEventSend)
+	LinkedListSetting.moveUpByIndex(self,index)
+	if not noEventSend then
+		self:sendEvent(self.NetworkTypes.MOVE_UP_X,index)
+	end
+end
+
+function SiloSelectedFillTypeSetting:moveDownByIndex(index,noEventSend)
+	LinkedListSetting.moveDownByIndex(self,index)
+	if not noEventSend then
+		self:sendEvent(self.NetworkTypes.MOVE_DOWN_X,index)
+	end
+end
+
+function SiloSelectedFillTypeSetting:deleteByIndex(index,noEventSend)
+	LinkedListSetting.deleteByIndex(self,index)
+	if not noEventSend then
+		self:sendEvent(self.NetworkTypes.DELETE_X,index)
+	end
 end
 
 function SiloSelectedFillTypeSetting:getKey(parentKey)
@@ -3069,7 +3124,6 @@ end
 
 function SiloSelectedFillTypeSetting:loadFromXml(xml, parentKey)
 	local size = getXMLInt(xml, self:getKey(parentKey)..self.xmlAttributeSize)
---	self.runCounterActive = getXMLBool(xml, self:getKey(parentKey)..self.xmlAttributeRunCounterActive)
 	if size and size>0 then
 		for key=1,size do 
 			local elementKey = string.format("%s.element(%d)", self:getKey(parentKey), key-1)
@@ -3088,7 +3142,6 @@ end
 function SiloSelectedFillTypeSetting:saveToXml(xml, parentKey)
 	local size = self:getSize()
 	setXMLInt(xml, self:getKey(parentKey)..self.xmlAttributeSize, Utils.getNoNil(size,0))
---	setXMLBool(xml, self:getKey(parentKey)..self.xmlAttributeRunCounterActive, Utils.getNoNil(self.runCounterActive,true))
 	if size > 0 then 
 		for key,data in ipairs(self:getData()) do
 			local elementKey = string.format("%s.element(%d)", self:getKey(parentKey), key-1)

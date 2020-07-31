@@ -250,7 +250,7 @@ end
 function AIDriver:start(startingPoint)
 	self:beforeStart()
 	self.state = self.states.RUNNING
-	self.loadingState = self.states.NOTHING
+	self:resetLoadingState()
 	-- derived classes must disable collision detection if they don't need its
 	self:enableCollisionDetection()
 	-- for now, initialize the course with the vehicle's current course

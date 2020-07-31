@@ -129,8 +129,8 @@ local function initialize()
 		'Events/StartStopWorkEvent',
 		'Events/UserConnectedEvent',
 		'Events/PostSyncEvent',
-		'Events/LinkedListSettingsEvent',
 		'Events/SettingsListEvent',
+		'Events/SiloSelectedFillTypeEvent',
 		'Generic/LinkedList'
 	};
 
