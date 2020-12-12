@@ -1118,7 +1118,7 @@ function AIDriver:dischargeAtUnloadPoint(dt,unloadPointIx)
 				local foundHeap = self:checkForHeapBehindMe(tipper)
 				
 				--when we reached the unload point, stop the tractor and inhibit any action from ppc till the trailer is empty
-				if (foundHeap or z >= 0) and tipper.cp.fillLevel ~= 0 or tipper:getTipState() ~= Trailer.TIPSTATE_CLOSED then
+				if z >= 0 and tipper.cp.fillLevel ~= 0 or foundHeap and tipper.cp.fillLevel ~= 0 and slippingNow or tipper:getTipState() ~= Trailer.TIPSTATE_CLOSED  then
 					stopForTipping = true
 					readyToDischarge = true
 				end
@@ -2095,6 +2095,7 @@ function AIDriver:getFuelLevelPercentage()
 	return 100
 end
 
+
 function AIDriver:getSiloSelectedFillTypeSetting()
 
 end
@@ -2110,6 +2111,7 @@ end
 function AIDriver:getCanShowDriveOnButton()
 	return self.triggerHandler:isLoading() or self.triggerHandler:isUnloading() or self:isWaiting()
 end
+
 
 --if validFillType ~= nil, then only open the first valid fillUnit for this fillType,
 --else open all possible covers
@@ -2153,3 +2155,4 @@ function AIDriver:isDetachAllowed(superFunc,preSuperFunc)
 	return superFunc(self,preSuperFunc)
 end
 AttacherJoints.isDetachAllowed = Utils.overwrittenFunction(AttacherJoints.isDetachAllowed, AIDriver.isDetachAllowed)
+
