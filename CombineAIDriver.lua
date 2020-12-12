@@ -990,7 +990,7 @@ function CombineAIDriver:createOuterHeadlandCornerCourse(turnContext)
 end
 
 function CombineAIDriver:isChopper()
-	return self.combine:getFillUnitCapacity(self.combine.fillUnitIndex) > 10000000
+	return self.combine:getFillUnitCapacity(self.combine.fillUnitIndex) > 10000000 or self.combine:getFillUnitCapacity(self.combine.fillUnitIndex)==10001
 end
 
 function CombineAIDriver:handlePipe()
@@ -1033,7 +1033,7 @@ function CombineAIDriver:handleChopperPipe()
 		local fillLevel = self.vehicle:getFillUnitFillLevel(self.combine.fillUnitIndex)
 		--self:debug('filltype = %s, fillLevel = %.1f', self:getFillType(), fillLevel)
 		-- not using isFillableTrailerUnderPipe() as the chopper sometimes has FillType.UNKNOWN
-		if self:getIsChopperWaitingForTrailer(fillLevel) then
+		if self:getIsChopperWaitingForTrailer(fillLevel) and not self.combine:getFillUnitCapacity(self.combine.fillUnitIndex)==10001 then
 			self:debugSparse('Chopper waiting for trailer, fill level %f', fillLevel)
 			self.isChopperWaitingForTrailer = true
 			self:setSpeed(0)
