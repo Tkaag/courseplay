@@ -788,7 +788,7 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 			newOffset = 0
 		end
 	else
-		newOffset = pipeOffset - offsetX
+		newOffset = -pipeOffset - offsetX
 	end
 	if newOffset ~= currentOffset then
 		self:debug('Change combine offset: %.1f -> %.1f (pipe %.1f), leftOk: %s rightOk: %s',
@@ -1770,7 +1770,7 @@ end
 function CombineUnloadAIDriver:startMovingBackFromCombine(newState)
 	self:releaseUnloader()
 	local reverseCourse = self:getStraightReverseCourse()
-	self:startCourse(reverseCourse, 1)
+	--self:startCourse(reverseCourse, 1)
 	self:setNewOnFieldState(newState)
 	return
 end
