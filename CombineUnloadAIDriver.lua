@@ -1745,7 +1745,7 @@ end
 function CombineUnloadAIDriver:startMovingBackFromCombine(newState)
 	self:releaseUnloader()
 	local reverseCourse = self:getStraightReverseCourse()
-	--self:startCourse(reverseCourse, 1)
+	self:startCourse(reverseCourse, 1)
 	self:setNewOnFieldState(newState)
 	return
 end
