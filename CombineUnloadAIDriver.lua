@@ -787,7 +787,7 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 			-- we are on the left, move to the middle
 			newOffset = 0
 		end
-	else
+	elseif courseplay:isAttachedCombine(combine)
 		newOffset = -pipeOffset - offsetX
 	end
 	if newOffset ~= currentOffset then
