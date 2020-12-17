@@ -768,7 +768,7 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 
 	-- fruit on both sides, stay behind the chopper
 	if not leftOk and not rightOk then
-		newOffset = 0
+		newOffset = 0 + offsetX
 	elseif leftOk and not rightOk then
 		-- no fruit to the left
 		if currentOffset >= 0 then
@@ -787,7 +787,7 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 			-- we are on the left, move to the middle
 			newOffset = 0
 		end
-	elseif courseplay:isAttachedCombine(combine) then
+	else
 		newOffset = -pipeOffset - offsetX
 	end
 	if newOffset ~= currentOffset then
