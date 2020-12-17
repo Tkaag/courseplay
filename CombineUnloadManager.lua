@@ -84,8 +84,8 @@ function CombineUnloadManager:addCombineToList(vehicle, driver)
 	self.combines[vehicle]= {
 		driver = driver,
 		combineObject = combineObject,
-		isChopper = courseplay:isChopper(combineObject) or combineObject:getFillUnitCapacity(1) ==10001,
-		isCombine = (courseplay:isCombine(combineObject) or combineObject.isPremos) and not courseplay:isChopper(combineObject) and not combineObject:getFillUnitCapacity(1) ==10001,
+		isChopper = courseplay:isChopper(combineObject) or courseplay:isAttachedCombine(combineObject) or combineObject.isPremos),
+		isCombine = (courseplay:isCombine(combineObject) and not (courseplay:isChopper(combineObject) or courseplay:isAttachedCombine(combineObject) or combineObject.isPremos),
 		isOnFieldNumber = 0;
 		fillLevel = 0;
 		fillLevelPct = 0;
