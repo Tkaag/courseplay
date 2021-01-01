@@ -527,9 +527,10 @@ end
 
 function CombineUnloadAIDriver:driveBesideChopper()
 	local targetNode = self:getTrailersTargetNode()
+	local _, offsetZ = self:getPipeOffset(self.combineToUnload)
 	self:renderText(0, 0.02,"%s: driveBesideChopper:offset local :%s saved:%s",nameNum(self.vehicle),tostring(self.combineOffset),tostring(self.vehicle.cp.combineOffset))
 	self:releaseAutoAimNode()
-	local _, _, dz = localToLocal(targetNode, self:getCombineRootNode(), 0, 0, 5)
+	local _, _, dz = localToLocal(targetNode, self:getCombineRootNode(), 0, 0, 5- offsetZ)
 	self:setSpeed(math.max(0, (self.combineToUnload.lastSpeedReal * 3600) + (MathUtil.clamp(-dz, -10, 15))))
 end
 
@@ -764,15 +765,16 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 	local leftOk, rightOk = g_combineUnloadManager:getPossibleSidesToDrive(combine)
 	local currentOffset = self.combineOffset
 	local newOffset = currentOffset
+	local offsetX = self.vehicle.cp.combineOffset
 
 	-- fruit on both sides, stay behind the chopper
 	if not leftOk and not rightOk then
-		newOffset = 0
+		newOffset = 0 + offsetX
 	elseif leftOk and not rightOk then
 		-- no fruit to the left
 		if currentOffset >= 0 then
 			-- we are already on the left or middle, go to left
-			newOffset = pipeOffset
+			newOffset = pipeOffset - offsetX
 		else
 			-- we are on the right, move to the middle
 			newOffset = 0
@@ -781,11 +783,13 @@ function CombineUnloadAIDriver:getChopperOffset(combine)
 		-- no fruit to the right
 		if currentOffset <= 0 then
 			-- we are already on the right or in the middle, move to the right
-			newOffset = -pipeOffset
+			newOffset = -pipeOffset + offsetX
 		else
 			-- we are on the left, move to the middle
 			newOffset = 0
 		end
+	else
+		newOffset = -pipeOffset - offsetX
 	end
 	if newOffset ~= currentOffset then
 		self:debug('Change combine offset: %.1f -> %.1f (pipe %.1f), leftOk: %s rightOk: %s',

@@ -990,7 +990,7 @@ function CombineAIDriver:createOuterHeadlandCornerCourse(turnContext)
 end
 
 function CombineAIDriver:isChopper()
-	return self.combine:getFillUnitCapacity(self.combine.fillUnitIndex) > 10000000
+	return self.combine:getFillUnitCapacity(self.combine.fillUnitIndex) > 10000000 or courseplay:isAttachedCombine(self.combine)
 end
 
 function CombineAIDriver:handlePipe()
@@ -1033,7 +1033,7 @@ function CombineAIDriver:handleChopperPipe()
 		local fillLevel = self.vehicle:getFillUnitFillLevel(self.combine.fillUnitIndex)
 		--self:debug('filltype = %s, fillLevel = %.1f', self:getFillType(), fillLevel)
 		-- not using isFillableTrailerUnderPipe() as the chopper sometimes has FillType.UNKNOWN
-		if self:getIsChopperWaitingForTrailer(fillLevel) then
+		if self:getIsChopperWaitingForTrailer(fillLevel) and not courseplay:isAttachedCombine(self.combine) then
 			self:debugSparse('Chopper waiting for trailer, fill level %f', fillLevel)
 			self.isChopperWaitingForTrailer = true
 			self:setSpeed(0)
@@ -1604,6 +1604,7 @@ function CombineAIDriver:addForwardProximitySensor()
 			self.vehicle, self.ppc, self:getFrontMarkerNode(self.vehicle), self.proximitySensorRange, 1, self.vehicle.cp.workWidth)
 end
 
+
 --- Check the vehicle in the proximity sensor's range. If it is player driven, don't slow them down when hitting this
 --- vehicle.
 --- Note that we don't really know if the player is to unload the combine, this will disable all proximity check for
@@ -1624,3 +1625,4 @@ function CombineAIDriver:isProximitySlowDownEnabled(vehicle)
 		return true
 	end
 end
+

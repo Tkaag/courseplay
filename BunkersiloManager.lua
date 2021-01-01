@@ -73,18 +73,23 @@ function BunkerSiloManager:createBunkerSiloMap(vehicle, Silo, width,isHeap)
 	local widthDirX,widthDirY,widthDirZ,widthDistance = courseplay:getWorldDirection(sx,sy,sz, wx,sy,wz);
 	local heightDirX,heightDirY,heightDirZ,heightDistance = courseplay:getWorldDirection(sx,sy,sz, hx,sy,hz);
 
-	local widthCount = 0
+	local 
+  Count = 0
+
 	courseplay.debugVehicle(10, vehicle, 'Bunker width %.1f, working width %.1f (passed in)', bunkerWidth, width)
-	widthCount =math.ceil(bunkerWidth/width)
+
+	widthCount =math.ceil(bunkerWidth/(width*0.7))
 
 	--check if this one is still needed ?
 --	if vehicle.cp.mode10.leveling and courseplay:isEven(widthCount) then
 --		widthCount = widthCount+1
 --	end
 
+
 	local heightCount = math.ceil(bunkerLength/ width)
 	local unitWidth = bunkerWidth/widthCount
 	local unitHeigth = bunkerLength/heightCount
+
 	
 	--width/height in 2D(x and z seperated) of silo
 
@@ -92,7 +97,9 @@ function BunkerSiloManager:createBunkerSiloMap(vehicle, Silo, width,isHeap)
 	local heightLengthZ = (hz-sz)/heightCount
 	local widthLengthX = (wx-sx)/widthCount
 	local widthLengthZ = (wz-sz)/widthCount
-	local getOffTheWall = 1;
+
+	local getOffTheWall = width*0.4;
+
 
 	local lastValidfillType = 0
 	local map = {}
