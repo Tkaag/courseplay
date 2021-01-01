@@ -1118,7 +1118,7 @@ function AIDriver:dischargeAtUnloadPoint(dt,unloadPointIx)
 				local foundHeap = self:checkForHeapBehindMe(tipper)
 				
 				--when we reached the unload point, stop the tractor and inhibit any action from ppc till the trailer is empty
-				if z >= 0 and tipper.cp.fillLevel ~= 0 or foundHeap and tipper.cp.fillLevel ~= 0 and AIDriver:detectSlipping() or tipper:getTipState() ~= Trailer.TIPSTATE_CLOSED  then
+				if z >= 0 and tipper.cp.fillLevel ~= 0 or foundHeap and tipper.cp.fillLevel ~= 0 and self.isSlipping or tipper:getTipState() ~= Trailer.TIPSTATE_CLOSED  then
 					stopForTipping = true
 					readyToDischarge = true
 				end
