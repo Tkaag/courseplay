@@ -451,7 +451,7 @@ function LevelCompactAIDriver:hasShieldEmpty()
 		if self.vehicle.cp.timers.bladeEmpty == nil or self.vehicle.cp.timers.bladeEmpty == 0 then
 
 			courseplay:setCustomTimer(self.vehicle, 'bladeEmpty', 3);
-		elseif courseplay:timerIsThrough(self.vehicle, 'bladeEmpty') and self.bestTarget.line > #self.vehicle.cp.BunkerSiloMap/2 then
+		elseif courseplay:timerIsThrough(self.vehicle, 'bladeEmpty') and self.bestTarget.line > #self.bunkerSiloManager.siloMap/2 then
 
 			courseplay:resetCustomTimer(self.vehicle, 'bladeEmpty');
 			self:debug("dropout bladeEmpty")
