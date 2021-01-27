@@ -3,7 +3,8 @@ local _;
 -- ##### MANAGING TOOLS ##### --
 function courseplay:attachImplement(implement)
 	local rootVehicle = implement:getRootVehicle()
-	if rootVehicle and SpecializationUtil.hasSpecialization(courseplay, rootVehicle.specializations) then
+	if rootVehicle and SpecializationUtil.hasSpecialization(courseplay, rootVehicle.specializations) and
+		rootVehicle.hasCourseplaySpec then
 		courseplay.debugVehicle(6, rootVehicle, '%s attached', nameNum(implement))
 		courseplay:updateOnAttachOrDetach(rootVehicle)
 	end
@@ -18,7 +19,8 @@ function courseplay:detachImplement(implementIndex)
 	local implement = spec.attachedImplements[implementIndex]
 	if implement then
 		local rootVehicle = implement.object:getRootVehicle()
-		if rootVehicle and SpecializationUtil.hasSpecialization(courseplay, rootVehicle.specializations) then
+		if rootVehicle and SpecializationUtil.hasSpecialization(courseplay, rootVehicle.specializations) and
+			rootVehicle.hasCourseplaySpec then
 			courseplay.debugVehicle(6, rootVehicle, '%s detached', nameNum(implement.object))
 			-- do not update yet as the implement is still attached to the vehicle.
 			-- defer the update until the next updateTick(), by that time things settle down
@@ -52,7 +54,7 @@ function courseplay:resetTools(vehicle)
 	vehicle.cp.hasAugerWagon = false;
 
 	vehicle.cp.workToolAttached = courseplay:updateWorkTools(vehicle, vehicle);
-	if not vehicle.cp.workToolAttached and not vehicle.cp.mode == courseplay.MODE_BUNKERSILO_COMPACTER then
+	if not vehicle.cp.workToolAttached and vehicle.cp.mode ~= courseplay.MODE_BUNKERSILO_COMPACTER then
 		courseplay:setCpMode(vehicle, courseplay.MODE_TRANSPORT)
 	end
 
@@ -136,6 +138,13 @@ end;
 
 -- UPDATE WORKTOOL DATA
 function courseplay:updateWorkTools(vehicle, workTool, isImplement)
+
+	-- temporary band aid until we figure out what exactly is causing this
+	if not vehicle.cp.mode then
+		vehicle.cp.mode = courseplay.MODE_TRANSPORT
+		courseplay.infoVehicle(vehicle, ' no CP mode set, worktool %s, forcing mode 5', nameNum(workTool))
+	end
+
 	if not isImplement then
 		cpPrintLine(6, 3);
 		courseplay:debug(('%s: updateWorkTools(%s, %q, isImplement=false) (mode=%d)'):format(nameNum(vehicle),tostring(vehicle.name), nameNum(workTool), vehicle.cp.mode), 6);
@@ -468,7 +477,7 @@ function courseplay:getAIMarkerWidth(object, logPrefix)
 	end
 end
 
---this one enable the buttons and allowes the user to change the mode
+--this one enable the buttons and allows the user to change the mode
 function courseplay:getIsToolCombiValidForCpMode(vehicle,cpModeToCheck)
 	--5 is always valid
 	if cpModeToCheck == 5 then 
@@ -484,7 +493,7 @@ function courseplay:getIsToolCombiValidForCpMode(vehicle,cpModeToCheck)
 end
 
 function courseplay:getIsToolValidForCpMode(object, mode, callback)
-	isAllowedOkay,isDisallowedOkay = CpManager.validModeSetupHandler:isModeValid(mode,object)
+	local isAllowedOkay,isDisallowedOkay = CpManager.validModeSetupHandler:isModeValid(mode,object)
 	callback.isAllowedOkay = callback.isAllowedOkay or isAllowedOkay
 	callback.isDisallowedOkay = callback.isDisallowedOkay and isDisallowedOkay
 	for _,impl in pairs(object:getAttachedImplements()) do
