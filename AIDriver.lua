@@ -281,7 +281,6 @@ function AIDriver:beforeStart()
 	self:setFrontMarkerNode(self.vehicle)
 
 	self:startEngineIfNeeded()
-	self:initWages()
 	self.firstReversingWheeledWorkTool = courseplay:getFirstReversingWheeledWorkTool(self.vehicle)
 	-- for now, pathfinding generated courses can't be driven by towed tools
 	self.allowReversePathfinding = self.firstReversingWheeledWorkTool == nil
@@ -1638,7 +1637,7 @@ function AIDriver:onDraw()
 		self.course:draw()
 	end
 	if CpManager.isDeveloper and self.pathfinder then
-		--PathfinderUtil.showNodes(self.pathfinder)
+		PathfinderUtil.showNodes(self.pathfinder)
 	end
 end
 --TODO: do we want to continue using this setter/getter for driveUnloadNow??
@@ -1775,14 +1774,6 @@ function AIDriver:detectSlipping()
 	end
 end
 
-function AIDriver:initWages()
-	local spec = self.vehicle.spec_aiVehicle
-	if spec.startedFarmId == nil or spec.startedFarmId == 0 then
-		-- to make the wage paying in AIVehicle work it needs to have the correct farm ID
-		spec.startedFarmId = self.vehicle.controllerFarmId
-	end
-end
-
 --- By default, do pay wages when enabled. Some derived classes may decide not to pay under circumstances
 function AIDriver:shouldPayWages()
 	return true
@@ -1835,7 +1826,10 @@ function AIDriver:setBackMarkerNode(vehicle)
 		local lastImplement
 		lastImplement, backMarkerOffset = AIDriverUtil.getLastAttachedImplement(vehicle)
 		referenceNode = vehicle.rootNode
-		self:debug('Using the last implement\'s rear distance for the rear proximity sensor, %d m from root node', backMarkerOffset)
+		self:debug('Using the last implement\'s rear distance for the rear proximity sensor, %d m from root node', backMarkerOffset) 	elseif self.measuredBackDistance then
+		referenceNode = vehicle.rootNode
+		backMarkerOffset = -self.measuredBackDistance
+		self:debug('back marker node on measured back distance %.1f', self.measuredBackDistance)
 	elseif reverserNode then
 		-- if there is a reverser node, use that, mainly because that most likely will turn with an implement
 		-- or with the back component of an articulated vehicle. Just need to find out the distance correctly
@@ -1847,9 +1841,13 @@ function AIDriver:setBackMarkerNode(vehicle)
 				debugText, backMarkerOffset, dBetweenRootAndReverserNode)
 	else
 		referenceNode = vehicle.rootNode
-		backMarkerOffset = - vehicle.sizeLength / 2 - vehicle.lengthOffset
+		backMarkerOffset = - vehicle.sizeLength / 2 + vehicle.lengthOffset
 		self:debug('Using the vehicle\'s root node for the rear proximity sensor, %d m from root node', backMarkerOffset)
 	end
+	self:placeBackMarkerNode(vehicle, referenceNode, backMarkerOffset)
+end
+
+function AIDriver:placeBackMarkerNode(vehicle, referenceNode, backMarkerOffset)
 	if not vehicle.cp.driver.aiDriverData.backMarkerNode then
 		vehicle.cp.driver.aiDriverData.backMarkerNode = courseplay.createNode('backMarkerNode', 0, 0, 0, referenceNode)
 	else
@@ -2129,7 +2127,7 @@ function AIDriver:getSiloSelectedFillTypeSetting()
 
 end
 
-function AIDriver:getSeperateFillTypeLoadingSetting()
+function AIDriver:getSeparateFillTypeLoadingSetting()
 
 end
 

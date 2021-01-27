@@ -338,7 +338,7 @@
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_3" 										text="Всегда 4х4 + блок. заднего дифф. на поле" />
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_4" 										text="Всегда 4х4 + блок. обоих дифф. на поле" />
 		<text name="COURSEPLAY_YES_NO_FIELDSCAN" 											text="Включить автосканирование полей?" />
-		<text name="COURSEPLAY_SUPPORT_INFO" 												text="Если вы обнаружили ошибку или нужна помощь с Courseplay, пожалуйста, загляните на https://github.com/Courseplay/courseplay" />
+		<text name="COURSEPLAY_SUPPORT_INFO" 												text="Если вы обнаружили ошибку или нужна помощь с Courseplay, пожалуйста, загляните на https://github.com/Courseplay/courseplay or https://courseplay.github.io/courseplay/en/index.html" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR" 										text="КАЛЬКУЛЯЦИЯ ПОСЕВОВ" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_FIELD" 									text="Поле: %d (%s %s)" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_SEEDTYPE" 								text="%s" />
@@ -493,8 +493,8 @@
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND"								text="Разгрузка комбайна на 1-й ПП" />
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND_TOOLTIP"						text="Разрешить разгрузку движущегося комбайн на первой поворотной полосе (ПП), при этом разгрузчику придётся выезжать за пределы поля." />
 		<text name="COURSEPLAY_RUNCOUNTER_ERROR_FOR_TRIGGER"								text="последний runCounter = 0" />
-		<text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES"									text="Загружать отдельные fillTypes" />
-		<text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES_TRAILERS"							text="Разделить прицепы:" />
+		<text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES"									text="Загружать отдельные fillTypes" />
+		<text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES_TRAILERS"							text="Разделить прицепы:" />
 		<text name="COURSEPLAY_MANUAL_LOADING"												text="Ручная загрузка" />
 
 		<text name="COURSEPLAY_WAITING_FOR_UNLOADERS"										text="ожидает разгружающих" />

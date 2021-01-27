@@ -30,14 +30,22 @@ widthNode -->	|				|	<-- startNode (sx,_,sz)
 ---@param vehicle vehicle
 ---@param Silo BunkerSilo or simulated HeapSilo
 ---@param float workwidth
----@param implement relevant workTool
+---@param node targetNode is either the front/back node of the implement used to check if the bestTarget was passed
 ---@param boolean is the silo a heap ?
-function BunkerSiloManager:init(vehicle, Silo, width, object,isHeap)
+function BunkerSiloManager:init(vehicle, Silo, width, targetNode,isHeap)
 	print("BunkerSiloManager: init()")
 	self.siloMap = self:createBunkerSiloMap(vehicle, Silo, width,isHeap)
 	self.silo = Silo
 	self.vehicle = vehicle
-	self.object = object
+	self.targetNode = targetNode
+end
+
+function BunkerSiloManager:getSiloMap()
+	return self.siloMap
+end
+
+function BunkerSiloManager:getSilo()
+	return self.silo
 end
 
 ---creating the relevant siloMap
@@ -81,9 +89,11 @@ function BunkerSiloManager:createBunkerSiloMap(vehicle, Silo, width,isHeap)
 	widthCount =math.ceil(bunkerWidth/(width*0.7))
 
 	--check if this one is still needed ?
---	if vehicle.cp.mode10.leveling and courseplay:isEven(widthCount) then
---		widthCount = widthCount+1
---	end
+	if vehicle.cp.driver.getIsModeLeveling then
+		if (vehicle.cp.driver:getIsModeLeveling() or vehicle.cp.driver:getIsModeFillUp()) and courseplay:isEven(widthCount) then
+			widthCount = widthCount+1
+		end
+	end
 
 
 	local heightCount = math.ceil(bunkerLength/ width)
@@ -91,7 +101,7 @@ function BunkerSiloManager:createBunkerSiloMap(vehicle, Silo, width,isHeap)
 	local unitHeigth = bunkerLength/heightCount
 
 	
-	--width/height in 2D(x and z seperated) of silo
+	--width/height in 2D(x and z separated) of silo
 
 	local heightLengthX = (hx-sx)/heightCount
 	local heightLengthZ = (hz-sz)/heightCount
@@ -267,7 +277,7 @@ function BunkerSiloManager:isAtEnd(bestTarget)
 	local targetUnit = self.siloMap[bestTarget.line][bestTarget.column]
 	local cx ,cz = targetUnit.cx, targetUnit.cz
 	local cy = getTerrainHeightAtWorldPos(g_currentMission.terrainRootNode, cx, 1, cz);
-	local x,y,z = getWorldTranslation(self.object.rootNode)
+	local x,y,z = getWorldTranslation(self.targetNode)
 	local distance2Target =  courseplay:distance(x,z, cx, cz) --distance from shovel to target
 	if distance2Target < 1 then
 		if bestTarget.line == #self.siloMap then
@@ -302,10 +312,10 @@ function BunkerSiloManager:getBestTargetFillUnitFillUp(bestTarget)
 				end
 				if column == #line and mostFillLevelAtLine > 0 then
 					fillingTarget = {
-										line = lineIndex;
-										column = mostFillLevelIndex;
-										empty = false;
-												}
+						line = lineIndex;
+						column = mostFillLevelIndex;
+						empty = false;
+					}
 					stopSearching = true
 					break
 				end
@@ -313,10 +323,10 @@ function BunkerSiloManager:getBestTargetFillUnitFillUp(bestTarget)
 		end
 		if mostFillLevelAtLine == 0 then
 			fillingTarget = {
-										line = 1;
-										column = 1;
-										empty = true;
-												}
+				line = 1;
+				column = 1;
+				empty = true;
+			}
 		end
 		
 		bestTarget = fillingTarget
@@ -340,9 +350,9 @@ function BunkerSiloManager:updateTarget(bestTarget)
 	local targetUnit = self.siloMap[bestTarget.line][bestTarget.column]
 	local cx ,cz = targetUnit.cx, targetUnit.cz
 	local cy = getTerrainHeightAtWorldPos(g_currentMission.terrainRootNode, cx, 1, cz);
-	local x,y,z = getWorldTranslation(self.object.rootNode)
+	local x,y,z = getWorldTranslation(self.targetNode)
 	local distance2Target =  courseplay:distance(x,z, cx, cz) --distance from shovel to target
-	if distance2Target < 1 then
+	if math.abs(distance2Target) < 1 then
 		bestTarget.line = math.min(bestTarget.line + 1, #self.siloMap)
 	end		
 end

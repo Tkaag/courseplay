@@ -63,8 +63,10 @@ function ProximitySensor:update()
     self.distanceOfClosestObject = math.huge
     self.objectId = nil
     if self.enabled then
-        raycastClosest(x, y + self.height, z, nx, ny, nz, 'raycastCallback', self.range, self, bitOR(AIVehicleUtil.COLLISION_MASK, 2))
---        cpDebug:drawLine(x, y + self.height, z, 0, 1, 0, tx, y2 + self.height, tz)
+        raycastClosest(x, y + self.height, z, nx, ny, nz, 'raycastCallback', self.range, self,
+                0x1000 + 0x100 + 0x80 + 0x40 + 0x20)
+                --bitOR(AIVehicleUtil.COLLISION_MASK, 0x1f0))
+        --cpDebug:drawLine(x, y + self.height, z, 0, 1, 0, x + 5 * nx, y + self.height + 5 * ny, z + 5 * nz)
     end
     if courseplay.debugChannels[12] and self.distanceOfClosestObject <= self.range then
         local green = self.distanceOfClosestObject / self.range
@@ -85,7 +87,7 @@ function ProximitySensor:raycastCallback(objectId, x, y, z, distance)
 end
 
 function ProximitySensor:getClosestObjectDistance()
---    self:showDebugInfo()
+    --self:showDebugInfo()
     return self.distanceOfClosestObject
 end
 
@@ -99,12 +101,13 @@ function ProximitySensor:getClosestRootVehicle()
 end
 
 function ProximitySensor:showDebugInfo()
+    if not courseplay.debugChannels[12] then return end
     local text = string.format('%.1f ', self.distanceOfClosestObject)
     if self.objectId then
         local object = g_currentMission:getNodeObject(self.objectId)
         if object then
             if object.getRootVehicle then
-                text = text .. 'vehicle' .. object:getName()
+                text = text .. 'vehicle ' .. object:getName()
             else
                 text = text .. object:getName()
             end

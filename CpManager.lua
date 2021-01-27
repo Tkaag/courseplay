@@ -21,13 +21,12 @@ function CpManager:loadMap(name)
 		self.savegameFolderPath = ('%ssavegame%d'):format(getUserProfileAppPath(), g_careerScreen.selectedIndex); -- This should work for both SP, MP and Dedicated Servers
 		self.cpSettingsXmlFilePath = self.savegameFolderPath .. '/courseplaySettings.xml';
 		self.cpCustomFieldsXmlFilePath = self.savegameFolderPath .. '/courseplayCustomFields.xml';
-		self.cpOldCustomFieldsXmlFilePath = self.savegameFolderPath .. '/courseplayFields.xml';
 
 		-- Course save path
 		self.cpCoursesFolderPath = ("%s%s/%s"):format(getUserProfileAppPath(),"CoursePlay_Courses", g_currentMission.missionInfo.mapId);
 		self.cpCourseManagerXmlFilePath = self.cpCoursesFolderPath .. "/courseManager.xml";
 		self.cpCourseStorageXmlFileTemplate = "courseStorage%04d.xml";
-
+		self.cpDebugPrintXmlFilePath = string.format("%s%s",getUserProfileAppPath(),"courseplayDebugPrint.xml")
 		-- we need to create CoursePlay_Courses folder before we can create any new folders inside it.
 		createFolder(("%sCoursePlay_Courses"):format(getUserProfileAppPath()));
 		createFolder(self.cpCoursesFolderPath);
@@ -46,6 +45,7 @@ function CpManager:loadMap(name)
 	-- LOAD SETTINGS FROM COURSEPLAYSETTINGS.XML / SAVE DEFAULT SETTINGS IF NOT EXISTING
 	if g_server ~= nil then
 		self:loadXmlSettings();
+		g_vehicleConfigurations:loadFromXml()
 	end
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- SETUP (continued)
@@ -83,7 +83,7 @@ function CpManager:loadMap(name)
 		self:setupFieldScanInfo();
 	end;
 	if g_server ~= nil then
-		courseplay.fields:loadCustomFields(fileExists(self.cpOldCustomFieldsXmlFilePath) and not fileExists(self.cpCustomFieldsXmlFilePath));
+		courseplay.fields:loadCustomFields();
 	end;
 
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -119,9 +119,10 @@ function CpManager:loadMap(name)
 	addConsoleCommand( 'cpRestartSaveGame', 'Load and start a savegame', 'restartSaveGame', self )
 	addConsoleCommand( 'cpSetLookaheadDistance', 'Set look ahead distance for the pure pursuit controller', 'setLookaheadDistance', self )
 	addConsoleCommand( 'cpCallVehicleFunction', 'Call a function on the current vehicle and print the results', 'callVehicleFunction', self )
-	addConsoleCommand( 'cpTogglePathfindingDebug', 'Toggle pathfinding visual debug info', 'togglePathfindingDebug', self )
+	addConsoleCommand( 'cpSetPathfindingDebug', 'Set pathfinding visual debug level (0-2)', 'setPathfindingDebug', self )
 	addConsoleCommand( 'cpToggleDevhelperDebug', 'Toggle development helper visual debug info', 'toggleDevhelperDebug', self )
 	addConsoleCommand( 'cpShowCombineUnloadManagerStatus', 'Show combine unload manager status', 'showCombineUnloadManagerStatus', self )
+	addConsoleCommand( 'cpReadVehicleConfigurations', 'Read custom vehicle configurations', 'loadFromXml', g_vehicleConfigurations)
 
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- TRIGGERS
@@ -419,7 +420,6 @@ function CpManager.saveXmlSettings(self)
 
 	-- createXMLFile will clear settings file if it exists
 	local cpSettingsXml = createXMLFile("cpSettingsXml", CpManager.cpSettingsXmlFilePath, "CPSettings");
-
 	if cpSettingsXml and cpSettingsXml ~= 0 then
 		local key = '';
 		-- Save Hud Possition
@@ -451,6 +451,7 @@ function CpManager.saveXmlSettings(self)
 
 		saveXMLFile(cpSettingsXml);
 		delete(cpSettingsXml);
+
 	else
 		print(("COURSEPLAY ERROR: unable to load or create file -> %s"):format(CpManager.cpSettingsXmlFilePath));
 	end;
@@ -511,9 +512,14 @@ function CpManager:devSaveAllFields()
 end
 
 --- Print a global variable
--- @param variableName name of the variable, can be multiple levels
--- @param depth maximum depth, 1 by default
-function CpManager:printVariable(variableName, maxDepth, printShortVersion)
+-- @param string variableName name of the variable, can be multiple levels
+-- @param int depth maximum depth, 1 by default
+-- @param int printToXML and printToXML>0 => printing variable to xmlFile
+function CpManager:printVariable(variableName, maxDepth,printToXML, printShortVersion)
+	if printToXML and tonumber(printToXML) and tonumber(printToXML)>0 then
+		HelperUtil.printVariableToXML(variableName, maxDepth)
+		return
+	end
 	print(string.format('%s - %s', tostring(variableName), tostring(maxDepth)))
 	local depth = maxDepth and math.max(1, tonumber(maxDepth)) or 1
 	local value = self:getVariable(variableName)
@@ -542,35 +548,37 @@ function CpManager:printVariable(variableName, maxDepth, printShortVersion)
 	return('Printed variable ' .. variableName)
 end
 
+
+
 --- Print the variable in the selected vehicle's namespace
 -- You can omit the dot for data members but if you want to call a function, you must start the variable name with a colon
-function CpManager:printVehicleVariable(variableName, maxDepth)
-	self:printVariableInternal( 'g_currentMission.controlledVehicle', variableName, maxDepth)
+function CpManager:printVehicleVariable(variableName, maxDepth, printToXML)
+	self:printVariableInternal( 'g_currentMission.controlledVehicle', variableName, maxDepth, printToXML)
 end
 
-function CpManager:printDriverVariable(variableName, maxDepth)
-	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.driver', variableName, maxDepth)
+function CpManager:printDriverVariable(variableName, maxDepth, printToXML)
+	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.driver', variableName, maxDepth, printToXML)
 end
 
-function CpManager:printSettingVariable(variableName, maxDepth)
-	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.settings', variableName, maxDepth)
+function CpManager:printSettingVariable(variableName, maxDepth, printToXML)
+	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.settings', variableName, maxDepth, printToXML)
 end
 
-function CpManager:printCourseGeneratorSettingVariable(variableName, maxDepth)
-	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.courseGeneratorSettings', variableName, maxDepth)
+function CpManager:printCourseGeneratorSettingVariable(variableName, maxDepth, printToXML)
+	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.courseGeneratorSettings', variableName, maxDepth, printToXML)
 end
 
-function CpManager:printGlobalSettingVariable(variableName, maxDepth)
-	self:printVariableInternal( 'g_currentMission.controlledVehicle.cp.globalSettings', variableName, maxDepth)
+function CpManager:printGlobalSettingVariable(variableName, maxDepth, printToXML)
+	self:printVariableInternal( 'courseplay.courseplay.globalSettings', variableName, maxDepth, printToXML)
 end
 
 
-function CpManager:printVariableInternal(prefix, variableName, maxDepth)
+function CpManager:printVariableInternal(prefix, variableName, maxDepth,printToXML)
 	if not StringUtil.startsWith(variableName, ':') and not StringUtil.startsWith(variableName, '.') then
 		-- allow to omit the . at the beginning of the variable name.
 		prefix = prefix .. '.'
 	end
-	self:printVariable(prefix .. variableName, maxDepth)
+	self:printVariable(prefix .. variableName, maxDepth,printToXML)
 end
 
 
@@ -727,8 +735,8 @@ function CpManager:callVehicleFunction(funcName, ...)
 	return 'Error when calling vehicle:' .. funcName
 end
 
-function CpManager:togglePathfindingDebug()
-	PathfinderUtil.toggleVisualDebug()
+function CpManager:setPathfindingDebug(d)
+	PathfinderUtil.setVisualDebug(tonumber(d))
 end
 
 function CpManager:toggleDevhelperDebug()

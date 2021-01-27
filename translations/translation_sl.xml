@@ -337,7 +337,7 @@
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_3" 						text="4WD Always &amp; Rear Diff on for Fieldwork" /> <!-- TODO: TRANSLATION! -->
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_4" 						text="4WD Always &amp; Both Diffs on for Fieldwork" /> <!-- TODO: TRANSLATION! -->
 		<text name="COURSEPLAY_YES_NO_FIELDSCAN" 							text="Ali želite da se polja skenirajo avtomatsko?" />
-		<text name="COURSEPLAY_SUPPORT_INFO" 								text="Have you found a bug or need help with courseplay, then please have a look at: https://github.com/Courseplay/courseplay" />
+		<text name="COURSEPLAY_SUPPORT_INFO" 								text="Have you found a bug or need help with courseplay, then please have a look at: https://github.com/Courseplay/courseplay or https://courseplay.github.io/courseplay/en/index.html" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR" 						text="Kalkulator porabe semen" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_FIELD" 					text="Polje: %d (%s %s)" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_SEEDTYPE" 				text="Vrsta semena: %s" />
@@ -491,8 +491,8 @@
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND"				text="Unload harvester on first headland" />
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND_TOOLTIP"		text="Allow unloading a moving harvester on the first headland, unloader drives off the field." />
 		<text name="COURSEPLAY_RUNCOUNTER_ERROR_FOR_TRIGGER"                text="last runCounter = 0" />
-        <text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES"                  text="Loading seperate FillTypes" />
-        <text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES_TRAILERS"         text="Seperate Trailers:" />
+        <text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES"                  text="Loading separate FillTypes" />
+        <text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES_TRAILERS"         text="Separate Trailers:" />
 		<text name="COURSEPLAY_UNLOADING_AMOUNT"							text="Unloading amount %d of %d" />
 		<text name="COURSEPLAY_MANUAL_LOADING"								text="manual Loading" />
 

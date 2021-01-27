@@ -21,7 +21,8 @@ PathfinderUtil = {}
 PathfinderUtil.dubinsSolver = DubinsSolver()
 PathfinderUtil.reedSheppSolver = ReedsSheppSolver()
 
-PathfinderUtil.defaultOffFieldPenalty = 10
+PathfinderUtil.defaultOffFieldPenalty = 7.5
+PathfinderUtil.visualDebugLevel = 0
 
 ---Size/turn radius all other information on the vehicle and its implements
 ---@class PathfinderUtil.VehicleData
@@ -38,8 +39,8 @@ function PathfinderUtil.VehicleData:init(vehicle, withImplements, buffer)
     self.vehicle = vehicle
     self.rootVehicle = vehicle:getRootVehicle()
     self.name = vehicle.getName and vehicle:getName() or 'N/A'
-    -- distance of the sides of a rectangle from the direction node of the vehicle
-    -- in other words, the X and Z offsets of the corners from the direction node
+    -- distance of the sides of a rectangle from the root node of the vehicle
+    -- in other words, the X and Z offsets of the corners from the root node
     -- negative is to the rear and to the right
     -- this is the bounding box of the entire vehicle with all attached implements,
     -- except a towed trailer as that is calculated independently
@@ -62,6 +63,7 @@ function PathfinderUtil.VehicleData:init(vehicle, withImplements, buffer)
             dLeft = self.trailer.sizeWidth / 2,
             dRight = -self.trailer.sizeWidth / 2
         }
+        -- TODO: this should be the attacher joint's offset, not the back of the vehicle.
         self.trailerHitchOffset = self.dRear
         self.trailerHitchLength = AIDriverUtil.getTowBarLength(vehicle)
     courseplay.debugVehicle(7, vehicle, 'trailer for the pathfinding is %s, hitch offset is %.1f',
@@ -74,22 +76,29 @@ end
 
 --- Calculate the relative coordinates of a rectangle's corners around a reference node, representing the implement
 function PathfinderUtil.VehicleData:getRectangleForImplement(implement, referenceNode, buffer)
-    local rootToReferenceNodeDistance  = 0
+    local rootToReferenceNodeOffset = 0
     local attacherJoint = implement.object.getActiveInputAttacherJoint and implement.object:getActiveInputAttacherJoint()
     if attacherJoint and attacherJoint.node then
         -- the implement may not be aligned with the vehicle so we need to calculate this distance in two
-        -- steps, first the distance between the vehicle's direction node and the attacher joint and then
+        -- steps, first the distance between the vehicle's root node and the attacher joint and then
         -- from the attacher joint to the implement's root node
+        -- < 0 when the attacher joint is behind the reference node
         local _, _, referenceToAttacherJoint = localToLocal(attacherJoint.node, referenceNode, 0, 0, 0)
+        -- > 0 when the attacher node is in front of the implement's root node (we don't use the attacher joint node
+        -- as a reference as it may point to any direction, we know the implement's root node points forward
         local _, _, attacherJointToImplementRoot = localToLocal(attacherJoint.node, implement.object.rootNode, 0, 0, 0)
-        rootToReferenceNodeDistance = attacherJointToImplementRoot - referenceToAttacherJoint
+        -- we call this offset, and is negative when behind the reference node, positive when in front of it
+        -- (need to reverse attacherJointToImplementRoot)
+        rootToReferenceNodeOffset = - attacherJointToImplementRoot + referenceToAttacherJoint
+        courseplay.debugFormat(7, '%s: ref to attacher joint %.1f, att to implement root %.1f, impl root to ref %.1f',
+            nameNum(implement.object), referenceToAttacherJoint, attacherJointToImplementRoot, rootToReferenceNodeOffset)
     else
-        _, _, rootToReferenceNodeDistance = localToLocal(implement.object.rootNode, referenceNode, 0, 0, 0)
+        _, _, rootToReferenceNodeOffset = localToLocal(implement.object.rootNode, referenceNode, 0, 0, 0)
     end
     -- default size, used by Giants to determine the drop area when buying something
     local rectangle = {
-        dFront = rootToReferenceNodeDistance + implement.object.sizeLength / 2 + implement.object.lengthOffset + (buffer or 0),
-        dRear = rootToReferenceNodeDistance - implement.object.sizeLength / 2 - implement.object.lengthOffset - (buffer or 0),
+        dFront = rootToReferenceNodeOffset + implement.object.sizeLength / 2 + implement.object.lengthOffset + (buffer or 0),
+        dRear = rootToReferenceNodeOffset - implement.object.sizeLength / 2 + implement.object.lengthOffset - (buffer or 0),
         dLeft = implement.object.sizeWidth / 2,
         dRight = -implement.object.sizeWidth / 2
     }
@@ -121,7 +130,7 @@ end
 function PathfinderUtil.VehicleData:calculateSizeOfObjectList(vehicle, implements, buffer, rectangles)
     for _, implement in ipairs(implements) do
         --print(implement.object:getName())
-        local referenceNode = AIDriverUtil.getDirectionNode(vehicle)
+        local referenceNode = vehicle.rootNode
         if implement.object ~= self.trailer then
             -- everything else is attached to the root vehicle and calculated as it was moving with it (having
             -- the same heading)
@@ -181,23 +190,11 @@ function PathfinderUtil.getFieldIdAtWorldPosition(posX, posZ)
     return 0
 end
 
----@class PathfinderUtil.Parameters
-PathfinderUtil.Parameters = CpObject()
----@param maxFruitPercent number maximum percentage of fruit present before a node is marked as invalid
----@param offFieldPenalty number penalty to add for every off-field node The higher, the more likely the vehicle will
----stay on field
-function PathfinderUtil.Parameters:init(maxFruitPercent, offFieldPenalty)
-    self.maxFruitPercent = maxFruitPercent or 50
-    self.offFieldPenalty = offFieldPenalty or PathfinderUtil.defaultOffFieldPenalty
-end
-
 --- Pathfinder context
 ---@class PathfinderUtil.Context
 PathfinderUtil.Context = CpObject()
-function PathfinderUtil.Context:init(vehicleData, fieldNum, parameters, vehiclesToIgnore, otherVehiclesCollisionData)
+function PathfinderUtil.Context:init(vehicleData, vehiclesToIgnore, otherVehiclesCollisionData)
     self.vehicleData = vehicleData
-    self.fieldNum = fieldNum
-    self.parameters = parameters
     self.vehiclesToIgnore = vehiclesToIgnore
     self.otherVehiclesCollisionData = otherVehiclesCollisionData
 end
@@ -306,7 +303,7 @@ end
 function PathfinderUtil.CollisionDetector:findCollidingShapes(node, vehicleData, vehiclesToIgnore, log)
     self.vehiclesToIgnore = vehiclesToIgnore or {}
     self.vehicleData = vehicleData
-    -- the box for overlapBox() is symmetric, so if our direction node is not in the middle of the vehicle rectangle,
+    -- the box for overlapBox() is symmetric, so if our root node is not in the middle of the vehicle rectangle,
     -- we have to translate it into the middle
     -- right/rear is negative
     local xOffset = vehicleData.dRight + vehicleData.dLeft
@@ -346,9 +343,9 @@ function PathfinderUtil.hasFruit(x, z, length, width)
         if not ignoreThis then
             -- if the last boolean parameter is true then it returns fruitValue > 0 for fruits/states ready for forage also
             local fruitValue, a, b, c = FSDensityMapUtil.getFruitArea(fruitType.index, x - width / 2, z - length / 2, x + width / 2, z, x, z + length / 2, true, true)
-            if g_updateLoopIndex % 200 == 0 then
+            --if g_updateLoopIndex % 200 == 0 then
                 --courseplay.debugFormat(7, '%.1f, %s, %s, %s %s', fruitValue, tostring(a), tostring(b), tostring(c), g_fruitTypeManager:getFruitTypeByIndex(fruitType.index).name)
-            end
+            --end
             if fruitValue > 0 then
                 return true, fruitValue, g_fruitTypeManager:getFruitTypeByIndex(fruitType.index).name
             end
@@ -453,19 +450,23 @@ field or driving to/from the field edge on an unload/refill course.
 ---@class PathfinderConstraints : PathfinderConstraintInterface
 PathfinderConstraints = CpObject(PathfinderConstraintInterface)
 
-function PathfinderConstraints:init(context)
+function PathfinderConstraints:init(context, maxFruitPercent, offFieldPenalty, fieldNum)
     self.context = context
-    self.normalMaxFruitPercent = self.context.parameters.maxFruitPercent
+    self.maxFruitPercent = maxFruitPercent or 50
+    self.offFieldPenalty = offFieldPenalty or PathfinderUtil.defaultOffFieldPenalty
+    self.fieldNum = fieldNum or 0
+    self.initialMaxFruitPercent = self.maxFruitPercent
+    self.initialOffFieldPenalty = self.offFieldPenalty
+    self:resetCounts()
+    courseplay.debugFormat(7, 'Pathfinder constraints: off field penalty %.1f, max fruit percent: %d, field number %d',
+        self.offFieldPenalty, self.maxFruitPercent, self.fieldNum)
 end
 
---- Is node outside of the preferred field?
-function PathfinderConstraints:isOutsideOfPreferredField(node)
-    if not self.fieldNum or self.fieldNum == 0 then
-        -- no preferred field, no penalty to apply
-        return false
-    else
-        return self.context.fieldNum ~= PathfinderUtil.getFieldIdAtWorldPosition(node.x, -node.y)
-    end
+function PathfinderConstraints:resetCounts()
+    self.totalNodeCount = 0
+    self.fruitPenaltyNodeCount = 0
+    self.offFieldPenaltyNodeCount = 0
+    self.collisionNodeCount = 0
 end
 
 --- Calculate penalty for this node. The penalty will be added to the cost of the node. This allows for
@@ -479,16 +480,31 @@ function PathfinderConstraints:getNodePenalty(node)
     local minRequiredAreaRatio = 0.8
     local penalty = 0
     local isField, area, totalArea = courseplay:isField(node.x, -node.y, areaSize, areaSize)
-    if area / totalArea < minRequiredAreaRatio or self:isOutsideOfPreferredField(node) then
-        penalty = penalty + self.context.parameters.offFieldPenalty
+    -- not on any field
+    local offFieldPenalty = self.offFieldPenalty
+    local offField = area / totalArea < minRequiredAreaRatio
+    if self.fieldNum ~= 0 and not offField then
+        -- if there's a preferred field and we are on a field
+        if self.fieldNum ~= PathfinderUtil.getFieldIdAtWorldPosition(node.x, -node.y) then
+            -- the field we are on is not ours, more penalty!
+            offField = true
+            offFieldPenalty = self.offFieldPenalty * 1.2
+        end
+    end
+    if offField then
+        penalty = penalty + offFieldPenalty
+        self.offFieldPenaltyNodeCount = self.offFieldPenaltyNodeCount + 1
+        node.offField = true
     end
     --local fieldId = PathfinderUtil.getFieldIdAtWorldPosition(node.x, -node.y)
     if isField then
         local hasFruit, fruitValue = PathfinderUtil.hasFruit(node.x, -node.y, areaSize, areaSize)
-        if hasFruit and fruitValue > self.context.parameters.maxFruitPercent then
+        if hasFruit and fruitValue > self.maxFruitPercent then
             penalty = penalty + fruitValue / 2
+            self.fruitPenaltyNodeCount = self.fruitPenaltyNodeCount + 1
         end
     end
+    self.totalNodeCount = self.totalNodeCount + 1
     return penalty
 end
 
@@ -496,10 +512,20 @@ end
 --- to find the optimum path, avoiding fruit. Instead, we just check for collisions with vehicles and objects as
 --- usual and also mark anything overlapping fruit as invalid. This way a path will only be considered if it is not
 --- in the fruit.
-function PathfinderConstraints:isValidAnalyticSolutionNode(node)
+--- However, we are more relaxed here and allow the double amount of fruit as being too restrictive here means
+--- that analytic paths are almost always invalid when they go near the fruit. Since analytic paths are only at the
+--- beginning at the end of the course and mostly curves, it is no problem getting closer to the fruit than otherwise
+function PathfinderConstraints:isValidAnalyticSolutionNode(node, log)
     local hasFruit, fruitValue = PathfinderUtil.hasFruit(node.x, -node.y, 3, 3)
-    if hasFruit and fruitValue > self.context.parameters.maxFruitPercent then return false end
-    return self:isValidNode(node)
+    local analyticLimit = self.maxFruitPercent * 2
+    if hasFruit and fruitValue > analyticLimit then
+        if log then
+            courseplay.debugFormat(7, 'isValidAnalyticSolutionNode: fruitValue %.1f, max %.1f @ %.1f, %.1f',
+                    fruitValue, analyticLimit, node.x, -node.y)
+        end
+        return false
+    end
+    return self:isValidNode(node, log)
 end
 
 --- Check if node is valid: would we collide with another vehicle or shape here?
@@ -535,18 +561,32 @@ function PathfinderConstraints:isValidNode(node, log, ignoreTrailer)
         node.collidingShapes = node.collidingShapes + PathfinderUtil.collisionDetector:findCollidingShapes(
                 PathfinderUtil.helperNode, self.context.vehicleData.trailerRectangle, self.context.vehiclesToIgnore, log)
     end
-    return (not node.isColliding and node.collidingShapes == 0)
+    local isValid = (not node.isColliding and node.collidingShapes == 0)
+    if not isValid then
+        self.collisionNodeCount = self.collisionNodeCount + 1
+    end
+    return isValid
 end
 
 function PathfinderConstraints:relaxConstraints()
+    self:showStatistics()
     courseplay.debugFormat(7, 'relaxing pathfinder constraints: allow driving through fruit')
-    self.context.parameters.maxFruitPercent = math.huge
+    self.maxFruitPercent = math.huge
+    self:resetCounts()
+end
+
+function PathfinderConstraints:showStatistics()
+    courseplay.debugFormat(7, 'Nodes: %d, Penalties: fruit: %d, off-field: %d, collisions: %d',
+            self.totalNodeCount, self.fruitPenaltyNodeCount, self.offFieldPenaltyNodeCount, self.collisionNodeCount)
+    courseplay.debugFormat(7, '  max fruit %.1f %%, off-field penalty: %.1f',
+            self.maxFruitPercent, self.offFieldPenalty)
 end
 
 function PathfinderConstraints:resetConstraints()
     courseplay.debugFormat(7, 'resetting pathfinder constraints: maximum fruit percent allowed is now %d',
-            self.normalMaxFruitPercent)
-    self.context.parameters.maxFruitPercent = self.normalMaxFruitPercent
+            self.initialMaxFruitPercent)
+    self.maxFruitPercent = self.initialMaxFruitPercent
+    self:resetCounts()
 end
 
 ---@param start State3D
@@ -561,24 +601,25 @@ end
 
 ---@param start State3D
 ---@param goal State3D
-local function startPathfindingFromVehicleToGoal(vehicle, start, goal,
-                                                 allowReverse, fieldNum,
-                                                 vehiclesToIgnore, maxFruitPercent, offFieldPenalty, mustBeAccurate)
+function PathfinderUtil.startPathfindingFromVehicleToGoal(vehicle, start, goal,
+                                                          allowReverse, fieldNum,
+                                                          vehiclesToIgnore, maxFruitPercent, offFieldPenalty, mustBeAccurate)
     local otherVehiclesCollisionData = PathfinderUtil.setUpVehicleCollisionData(vehicle, vehiclesToIgnore)
-    local parameters = PathfinderUtil.Parameters(maxFruitPercent or
-            (vehicle.cp.settings.useRealisticDriving:is(true) and 50 or math.huge),
-            offFieldPenalty or PathfinderUtil.defaultOffFieldPenalty)
     local vehicleData = PathfinderUtil.VehicleData(vehicle, true, 0.5)
 
     initializeTrailerHeading(start, vehicleData)
 
     local context = PathfinderUtil.Context(
             vehicleData,
-            fieldNum,
-            parameters,
             vehiclesToIgnore,
             otherVehiclesCollisionData)
-    return PathfinderUtil.startPathfinding(start, goal, context, allowReverse, mustBeAccurate)
+
+    local constraints = PathfinderConstraints(context,
+            maxFruitPercent or (vehicle.cp.settings.useRealisticDriving:is(true) and 50 or math.huge),
+            offFieldPenalty or PathfinderUtil.defaultOffFieldPenalty,
+            fieldNum)
+
+    return PathfinderUtil.startPathfinding(start, goal, context, constraints, allowReverse, mustBeAccurate)
 end
 
 ---@param course Course
@@ -617,13 +658,14 @@ end
 ---@param start State3D start node
 ---@param goal State3D goal node
 ---@param context PathfinderUtil.Context
+---@param constraints PathfinderConstraints
 ---@param allowReverse boolean allow reverse driving
 ---@param mustBeAccurate boolean must be accurately find the goal position/angle (optional)
-function PathfinderUtil.startPathfinding(start, goal, context, allowReverse, mustBeAccurate)
+function PathfinderUtil.startPathfinding(start, goal, context, constraints, allowReverse, mustBeAccurate)
     PathfinderUtil.overlapBoxes = {}
-    local pathfinder = HybridAStarWithAStarInTheMiddle(context.vehicleData.turnRadius * 4, 100, 40000, mustBeAccurate)
+    local pathfinder = HybridAStarWithAStarInTheMiddle(context.vehicleData.turnRadius * 4, 100, 140000, mustBeAccurate)
     local done, path, goalNodeInvalid = pathfinder:start(start, goal, context.vehicleData.turnRadius, allowReverse,
-            PathfinderConstraints(context), context.vehicleData.trailerHitchLength)
+            constraints, context.vehicleData.trailerHitchLength)
     return pathfinder, done, path, goalNodeInvalid
 end
 
@@ -664,15 +706,13 @@ function PathfinderUtil.findPathForTurn(vehicle, startOffset, goalReferenceNode,
 
     local fieldNum = PathfinderUtil.getFieldNumUnderVehicle(vehicle)
     local otherVehiclesCollisionData =PathfinderUtil.setUpVehicleCollisionData(vehicle, vehiclesToIgnore)
-    local parameters = PathfinderUtil.Parameters(nil, vehicle.cp.settings.turnOnField:is(true) and 10 or nil, false)
     local context = PathfinderUtil.Context(
             PathfinderUtil.VehicleData(vehicle, true, 0.5),
-            fieldNum,
-            parameters,
             vehiclesToIgnore,
             otherVehiclesCollisionData)
+    local constraints = PathfinderConstraints(context, nil, vehicle.cp.settings.turnOnField:is(true) and 10 or nil, fieldNum)
     local done, path, goalNodeInvalid = pathfinder:start(start, goal, turnRadius, allowReverse,
-            PathfinderConstraints(context), context.vehicleData.trailerHitchLength)
+            constraints, context.vehicleData.trailerHitchLength)
     return pathfinder, done, path, goalNodeInvalid
 end
 
@@ -716,15 +756,17 @@ end
 --- pathfinding considers any collision-free path valid, also outside of the field.
 ---@param vehiclesToIgnore table[] list of vehicles to ignore for the collision detection (optional)
 ---@param maxFruitPercent number maximum percentage of fruit present before a node is marked as invalid (optional)
+---@param offFieldPenalty number penalty to apply to nodes off the field
 function PathfinderUtil.startPathfindingFromVehicleToWaypoint(vehicle, goalWaypoint,
                                                               xOffset, zOffset, allowReverse,
-                                                              fieldNum, vehiclesToIgnore, maxFruitPercent)
+                                                              fieldNum, vehiclesToIgnore, maxFruitPercent, offFieldPenalty)
     local x, z, yRot = PathfinderUtil.getNodePositionAndDirection(AIDriverUtil.getDirectionNode(vehicle))
     local start = State3D(x, -z, courseGenerator.fromCpAngle(yRot))
     local goal = State3D(goalWaypoint.x, -goalWaypoint.z, courseGenerator.fromCpAngleDeg(goalWaypoint.angle))
     local offset = Vector(zOffset, -xOffset)
     goal:add(offset:rotate(goal.t))
-    return startPathfindingFromVehicleToGoal(vehicle, start, goal, allowReverse, fieldNum, vehiclesToIgnore, maxFruitPercent)
+    return PathfinderUtil.startPathfindingFromVehicleToGoal(
+            vehicle, start, goal, allowReverse, fieldNum, vehiclesToIgnore, maxFruitPercent, offFieldPenalty)
 end
 ------------------------------------------------------------------------------------------------------------------------
 --- Interface function to start the pathfinder in the game. The goal is a point at sideOffset meters from the goal node
@@ -738,6 +780,7 @@ end
 ---@param fieldNum number if other than 0 or nil the pathfinding is restricted to the given field and its vicinity
 ---@param vehiclesToIgnore table[] list of vehicles to ignore for the collision detection (optional)
 ---@param maxFruitPercent number maximum percentage of fruit present before a node is marked as invalid (optional)
+---@param offFieldPenalty number penalty to apply to nodes off the field
 ---@param mustBeAccurate boolean must be accurately find the goal position/angle (optional)
 function PathfinderUtil.startPathfindingFromVehicleToNode(vehicle, goalNode,
                                                           xOffset, zOffset, allowReverse,
@@ -747,7 +790,7 @@ function PathfinderUtil.startPathfindingFromVehicleToNode(vehicle, goalNode,
     local start = State3D(x, -z, courseGenerator.fromCpAngle(yRot))
     x, z, yRot = PathfinderUtil.getNodePositionAndDirection(goalNode, xOffset, zOffset)
     local goal = State3D(x, -z, courseGenerator.fromCpAngle(yRot))
-    return startPathfindingFromVehicleToGoal(
+    return PathfinderUtil.startPathfindingFromVehicleToGoal(
             vehicle, start, goal, allowReverse, fieldNum,
             vehiclesToIgnore, maxFruitPercent, offFieldPenalty, mustBeAccurate)
 end
@@ -771,41 +814,43 @@ function PathfinderUtil.startAStarPathfindingFromVehicleToNode(vehicle, goalNode
     local goal = State3D(x, -z, courseGenerator.fromCpAngle(yRot))
 
     local otherVehiclesCollisionData = PathfinderUtil.setUpVehicleCollisionData(vehicle, vehiclesToIgnore)
-    local parameters = PathfinderUtil.Parameters(maxFruitPercent or
-            (vehicle.cp.settings.useRealisticDriving:is(true) and 50 or math.huge), PathfinderUtil.defaultOffFieldPenalty)
     local vehicleData = PathfinderUtil.VehicleData(vehicle, true, 0.5)
 
     initializeTrailerHeading(start, vehicleData)
 
     local context = PathfinderUtil.Context(
             vehicleData,
-            fieldNum,
-            parameters,
             vehiclesToIgnore,
             otherVehiclesCollisionData)
 
+    local constraints = PathfinderConstraints(context,
+            maxFruitPercent or (vehicle.cp.settings.useRealisticDriving:is(true) and 50 or math.huge),
+            PathfinderUtil.defaultOffFieldPenalty,
+            fieldNum)
+
     local pathfinder = AStar(100, 10000)
     local done, path, goalNodeInvalid = pathfinder:start(start, goal, context.vehicleData.turnRadius, false,
-            PathfinderConstraints(context), context.vehicleData.trailerHitchLength)
+            constraints, context.vehicleData.trailerHitchLength)
     return pathfinder, done, path, goalNodeInvalid
 end
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Debug stuff
 ---------------------------------------------------------------------------------------------------------------------------
-function PathfinderUtil.toggleVisualDebug()
-    PathfinderUtil.isVisualDebugEnabled = not PathfinderUtil.isVisualDebugEnabled
+function PathfinderUtil.setVisualDebug(d)
+    PathfinderUtil.visualDebugLevel = d
 end
 
 function PathfinderUtil.showNodes(pathfinder)
-    if not PathfinderUtil.isVisualDebugEnabled then return end
+    if PathfinderUtil.visualDebugLevel < 1 then return end
     if pathfinder then
         local nodes
-        if pathfinder.hybridAStarPathfinder and pathfinder.hybridAStarPathfinder.nodes then
+        if PathfinderUtil.visualDebugLevel > 1 and
+                pathfinder.hybridAStarPathfinder and pathfinder.hybridAStarPathfinder.nodes then
             nodes = pathfinder.hybridAStarPathfinder.nodes
-        elseif pathfinder.aStarPathfinder and pathfinder.aStarPathfinder.nodes then
+        elseif PathfinderUtil.visualDebugLevel > 0 and pathfinder.aStarPathfinder and pathfinder.aStarPathfinder.nodes then
             nodes = pathfinder.aStarPathfinder.nodes
-        elseif pathfinder.nodes then
+        elseif PathfinderUtil.visualDebugLevel > 0 and pathfinder.nodes then
             nodes = pathfinder.nodes
         end
         if nodes then
@@ -814,16 +859,17 @@ function PathfinderUtil.showNodes(pathfinder)
                     for _, cell in pairs(column) do
                         if cell.x and cell.y then
                             local range = nodes.highestCost - nodes.lowestCost
-                            local color = (cell.cost - nodes.lowestCost) * 250 / range
+                            local color = (cell.cost - nodes.lowestCost) / range
                             local r, g, b
-                            if cell:isClosed() or true then
-                                r, g, b = 100 + color, 250 - color, 0
+                            if cell.offField then
+                                r, g, b = 250 * color, 250 - 250 * color, 0
                             else
-                                r, g, b = cell.cost *3, 80, 0
+                                r, g, b = color, 1 - color, 0
                             end
                             local y = getTerrainHeightAtWorldPos(g_currentMission.terrainRootNode, cell.x, 0, -cell.y)
+                            cpDebug:drawPoint(cell.x, y + 1, -cell.y, r, g, b)
                             if cell.pred and cell.pred.y then
-                                cpDebug:drawLineRGB(cell.x, y + 1, -cell.y, r, g, b, cell.pred.x, y + 1, -cell.pred.y)
+--                                cpDebug:drawLineRGB(cell.x, y + 1 + height, -cell.y, r, g, b, cell.pred.x, y + 1 + height, -cell.pred.y)
                             end
                             if cell.isColliding then
                                 cpDebug:drawPoint(cell.x, y + 1.2, -cell.y, 100, 0, 0)

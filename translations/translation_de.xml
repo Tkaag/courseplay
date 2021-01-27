@@ -76,7 +76,7 @@
 		<text name="COURSEPLAY_NEEDS_REFILLING" 							text=": Gerät muss aufgefüllt werden" />
 		<text name="COURSEPLAY_UNLOADING_BALES" 							text="Ballen werden entladen." />
 		<text name="COURSEPLAY_IS_IN_TRAFFIC" 								text="Steckt im Verkehr fest" />
-		<text name="COURSEPLAY_SLOWING_DOWN_FOR_TRAFFIC" 					text="slowing down for traffic" />
+		<text name="COURSEPLAY_SLOWING_DOWN_FOR_TRAFFIC" 					text="Bremse ab auf Grund von Verkehr" />
 		<text name="COURSEPLAY_TIPTRIGGER_REACHED" 							text="Abladestelle erreicht" />
 		<text name="COURSEPLAY_LAST_VAILD_TIP_DIST" 						text="Abstand z. Abladepunkt" />
 		<text name="COURSEPLAY_LOADING_AMOUNT" 								text="Wird beladen: %d von %d" />
@@ -337,7 +337,7 @@
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_3" 						text="4WD an &amp; Hinterachssperrdiff auf dem Feld" />
 		<text name="COURSEPLAY_DRIVECONTROL_MODE_4" 						text="4WD an &amp; Sperrdifferential auf den Feld" />
 		<text name="COURSEPLAY_YES_NO_FIELDSCAN" 							text="Möchtest du dass die Felder automatisch gescannt werden?" />
-		<text name="COURSEPLAY_SUPPORT_INFO" 								text="Bei Fehler oder Fragen gerne auf der folgenden seite für hilfe vorbeischauen: https://github.com/Courseplay/courseplay" />
+		<text name="COURSEPLAY_SUPPORT_INFO" 								text="Bei Fehler oder Fragen gerne auf der folgenden seite für hilfe vorbeischauen: https://github.com/Courseplay/courseplay oder or https://courseplay.github.io/courseplay/en/index.html" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR" 						text="Saatgut-Rechner" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_FIELD" 					text="Feld: %d (%s %s)" />
 		<text name="COURSEPLAY_SEEDUSAGECALCULATOR_SEEDTYPE" 				text="Saattyp: %s" />
@@ -490,8 +490,8 @@
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND"				text="Entlade Drescher im Vorgewende" />
 		<text name="COURSEPLAY_ALLOW_UNLOAD_ON_FIRST_HEADLAND_TOOLTIP"		text="Fahrenden Drescher im ersten Vorgewende entladen, Abfahrer fährt außerhalb des Feldes." />
 		<text name="COURSEPLAY_RUNCOUNTER_ERROR_FOR_TRIGGER"                text="letzter Durchlauf = 0" />
-        <text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES"                  text="verschiedene Ladegüter" />
-        <text name="COURSEPLAY_LOADING_SEPERATE_FILLTYPES_TRAILERS"         text="verschiedene Trailer: " />
+        <text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES"                  text="verschiedene Ladegüter" />
+        <text name="COURSEPLAY_LOADING_SEPARATE_FILLTYPES_TRAILERS"         text="verschiedene Trailer: " />
 		<text name="COURSEPLAY_UNLOADING_AMOUNT"							text="Entladen %d of %d" />
 		<text name="COURSEPLAY_MANUAL_LOADING"								text="manuelles laden" />
 

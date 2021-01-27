@@ -91,6 +91,11 @@ function FieldworkAIDriver.register()
 				return true
 			elseif SpecializationUtil.hasSpecialization(Pickup, self.specializations) then
 				return true
+			elseif SpecializationUtil.hasSpecialization(Cutter, self.specializations) then
+				-- this is to make the straw pickup headers for choppers work as they are
+				-- not recognized as AI Implements since they don't have AI markers
+				-- so they don't unfold on the AI start line event
+				return true
 			elseif strawHarvestBaleCollectSpec and SpecializationUtil.hasSpecialization(strawHarvestBaleCollectSpec, self.specializations) then
 				return true
 			elseif superFunc ~= nil then
@@ -448,7 +453,7 @@ function FieldworkAIDriver:stopAndChangeToUnload()
 		self:changeToUnloadOrRefill()
 		self:startCourseWithPathfinding(self.unloadRefillCourse, 1)
 	else
-		if self.vehicle.cp.settings.autoDriveMode:useForUnloadOrRefill() then
+		if self.vehicle.spec_autodrive and self.vehicle.cp.settings.autoDriveMode:useForUnloadOrRefill() then
 			-- Switch to AutoDrive when enabled 
 			self:rememberWaypointToContinueFieldwork()
 			self:stopWork()
@@ -471,7 +476,7 @@ function FieldworkAIDriver:isFuelLevelOk()
 end
 
 function FieldworkAIDriver:stopAndRefuel()
-	if self.vehicle.cp.settings.autoDriveMode:useForUnloadOrRefill() then
+	if self.vehicle.spec_autodrive and self.vehicle.cp.settings.autoDriveMode:useForUnloadOrRefill() and self.vehicle.spec_autodrive.getSetting("autoRefuel", self.vehicle) then
 		-- Switch to AutoDrive when enabled 
 		self:rememberWaypointToContinueFieldwork()
 		self:stopWork()
@@ -793,7 +798,7 @@ function FieldworkAIDriver:setUpCourses()
 	-- get a signature of the course now, before offsetting it so can compare for the convoy
 	self.fieldworkCourseHash = self.fieldworkCourse:getHash()
 	-- apply the current tool offset to the fieldwork part (multitool offset is added by calculateOffsetCourse when needed)
-	self.fieldworkCourse:setOffset(self.vehicle.cp.toolOffsetX, self.vehicle.cp.toolOffsetZ)
+	self.fieldworkCourse:setOffset(self.vehicle.cp.settings.toolOffsetX:get(), self.vehicle.cp.settings.toolOffsetZ:get())
 	-- TODO: consolidate the working width calculation and usage, this is currently an ugly mess
 	self.fieldworkCourse:setWorkWidth(self.vehicle.cp.courseWorkWidth or courseplay:getWorkWidth(self.vehicle))
 	if self.vehicle.cp.multiTools > 1 then
@@ -825,8 +830,8 @@ end
 function FieldworkAIDriver:updateFieldworkOffset()
 	-- (as lua passes tables by reference, we can directly change self.fieldworkCourse even if we passed self.course
 	-- to the PPC to drive)
-	self.fieldworkCourse:setOffset(self.vehicle.cp.toolOffsetX + self.aiDriverOffsetX + (self.tightTurnOffset or 0),
-		self.vehicle.cp.toolOffsetZ + self.aiDriverOffsetZ)
+	self.fieldworkCourse:setOffset(self.vehicle.cp.settings.toolOffsetX:get() + self.aiDriverOffsetX + (self.tightTurnOffset or 0),
+		self.vehicle.cp.settings.toolOffsetZ:get() + self.aiDriverOffsetZ)
 end
 
 function FieldworkAIDriver:hasSameCourse(otherVehicle)
@@ -1124,7 +1129,8 @@ function FieldworkAIDriver:startTurn(ix)
 	-- this should help returning to the course faster.
 	self.ppc:setShortLookaheadDistance()
 	self:setMarkers()
-	self.turnContext = TurnContext(self.course, ix, self.aiDriverData, self.vehicle.cp.workWidth, self.frontMarkerDistance,
+	self.turnContext = TurnContext(self.course, ix, self.aiDriverData, self.vehicle.cp.workWidth,
+			self.frontMarkerDistance, self.backMarkerDistance,
 			self:getTurnEndSideOffset(), self:getTurnEndForwardOffset())
 	if self.vehicle.cp.settings.useAITurns:is(true) then
 		if self:startAiTurn(ix) then
@@ -1178,12 +1184,16 @@ function FieldworkAIDriver:setMarkers()
 			backMarkerDistance = d
 		end
 	end
-	-- set these up for turn.lua. TODO: pass in with the turn context and get rid of the aiFrontMarker and backMarkerOffset completely
-	self.vehicle.cp.aiFrontMarker = frontMarkerDistance
 	self.frontMarkerDistance = frontMarkerDistance
-	self.vehicle.cp.backMarkerOffset = backMarkerDistance
 	self.backMarkerDistance = backMarkerDistance
 	self:debug('front marker: %.1f, back marker: %.1f', frontMarkerDistance, backMarkerDistance)
+end
+
+function FieldworkAIDriver:getMarkers()
+	if not self.frontMarkerDistance then
+		self:setMarkers()
+	end
+	return self.frontMarkerDistance, self.backMarkerDistance
 end
 
 function FieldworkAIDriver:getAIMarkers(object, suppressLog)
@@ -1191,7 +1201,7 @@ function FieldworkAIDriver:getAIMarkers(object, suppressLog)
 	if object.getAIMarkers then
 		aiLeftMarker, aiRightMarker, aiBackMarker = object:getAIMarkers()
 	end
-	if not aiLeftMarker or not aiRightMarker or not aiLeftMarker then
+	if not aiLeftMarker or not aiRightMarker or not aiBackMarker then
 		-- use the root node if there are no AI markers
 		if not suppressLog then
 			self:debug('%s has no AI markers, try work areas', nameNum(object))
@@ -1340,7 +1350,10 @@ function FieldworkAIDriver:onDraw()
 				DebugUtil.drawDebugNode(aiSizeBackMarker, object:getName() .. ' AI Size Back')
 			end
 		end
-		DebugUtil.drawDebugNode(object.cp.directionNode or object.rootNode, object:getName() .. ' root')
+		DebugUtil.drawDebugNode(object.rootNode, object:getName() .. ' root')
+		if object.cp.directionNode then
+			DebugUtil.drawDebugNode(object.cp.directionNode, object:getName() .. ' dir')
+		end
 	end
 
 	showAIMarkersOfObject(self.vehicle)
